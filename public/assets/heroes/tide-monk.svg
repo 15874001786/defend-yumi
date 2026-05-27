@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 112">
+  <defs>
+    <radialGradient id="a" cx="34%" cy="22%" r="80%">
+      <stop offset="0%" stop-color="#e4fff8"/>
+      <stop offset="62%" stop-color="#3bb3b8"/>
+      <stop offset="100%" stop-color="#10292d"/>
+    </radialGradient>
+    <filter id="s" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000" flood-opacity=".45"/>
+    </filter>
+  </defs>
+  <ellipse cx="48" cy="100" rx="32" ry="8" fill="#050706" opacity=".42"/>
+  <g filter="url(#s)">
+    <path d="M17 67 C34 25 62 25 78 67 C63 55 55 91 33 91 C22 91 14 81 17 67 Z" fill="url(#a)" stroke="#e4fff8" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="45" cy="50" r="15" fill="#10292d" opacity=".72"/>
+    <circle cx="39" cy="48" r="3" fill="#e4fff8"/>
+    <circle cx="51" cy="48" r="3" fill="#e4fff8"/>
+    <path d="M33 69 C39 76 53 76 59 69" fill="none" stroke="#e4fff8" stroke-width="3" stroke-linecap="round" opacity=".88"/>
+    <text x="48" y="107" text-anchor="middle" font-size="15" font-family="Microsoft YaHei, sans-serif" font-weight="800" fill="#e4fff8">潮</text>
+  </g>
+</svg>

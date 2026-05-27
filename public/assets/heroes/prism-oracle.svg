@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 112">
+  <defs>
+    <radialGradient id="a" cx="34%" cy="22%" r="80%">
+      <stop offset="0%" stop-color="#82fff6"/>
+      <stop offset="62%" stop-color="#ff6ec7"/>
+      <stop offset="100%" stop-color="#26112d"/>
+    </radialGradient>
+    <filter id="s" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000" flood-opacity=".45"/>
+    </filter>
+  </defs>
+  <ellipse cx="48" cy="100" rx="32" ry="8" fill="#050706" opacity=".42"/>
+  <g filter="url(#s)">
+    <path d="M45 12 L78 50 L45 96 L12 50 Z" fill="url(#a)" stroke="#82fff6" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="45" cy="50" r="15" fill="#26112d" opacity=".72"/>
+    <circle cx="39" cy="48" r="3" fill="#82fff6"/>
+    <circle cx="51" cy="48" r="3" fill="#82fff6"/>
+    <path d="M33 69 C39 76 53 76 59 69" fill="none" stroke="#82fff6" stroke-width="3" stroke-linecap="round" opacity=".88"/>
+    <text x="48" y="107" text-anchor="middle" font-size="15" font-family="Microsoft YaHei, sans-serif" font-weight="800" fill="#82fff6">棱</text>
+  </g>
+</svg>

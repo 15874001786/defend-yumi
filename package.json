@@ -1,0 +1,23 @@
+{
+  "name": "crystal-wardens",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "npm run assets",
+    "dev": "vite --host 0.0.0.0",
+    "prebuild": "npm run assets",
+    "build": "tsc && vite build",
+    "test": "vitest run",
+    "assets": "node scripts/generate-assets.mjs"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.1.4"
+  }
+}

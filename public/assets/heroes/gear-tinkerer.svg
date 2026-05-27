@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 112">
+  <defs>
+    <radialGradient id="a" cx="34%" cy="22%" r="80%">
+      <stop offset="0%" stop-color="#ffb347"/>
+      <stop offset="62%" stop-color="#aec3c0"/>
+      <stop offset="100%" stop-color="#202323"/>
+    </radialGradient>
+    <filter id="s" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000" flood-opacity=".45"/>
+    </filter>
+  </defs>
+  <ellipse cx="48" cy="100" rx="32" ry="8" fill="#050706" opacity=".42"/>
+  <g filter="url(#s)">
+    <path d="M45 18 L53 28 L66 25 L68 39 L80 45 L70 56 L72 70 L58 72 L51 83 L39 83 L32 72 L18 70 L20 56 L10 45 L22 39 L24 25 L37 28 Z" fill="url(#a)" stroke="#ffb347" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="45" cy="50" r="15" fill="#202323" opacity=".72"/>
+    <circle cx="39" cy="48" r="3" fill="#ffb347"/>
+    <circle cx="51" cy="48" r="3" fill="#ffb347"/>
+    <path d="M33 69 C39 76 53 76 59 69" fill="none" stroke="#ffb347" stroke-width="3" stroke-linecap="round" opacity=".88"/>
+    <text x="48" y="107" text-anchor="middle" font-size="15" font-family="Microsoft YaHei, sans-serif" font-weight="800" fill="#ffb347">齿</text>
+  </g>
+</svg>
