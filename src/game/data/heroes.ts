@@ -279,6 +279,13 @@ export function calculateHeroStats(hero: HeroDefinition, level: number, baseLeve
   };
 }
 
+export function directHeroUpgradeCost(hero: HeroDefinition, level: number): number | null {
+  if (!canMerge(level)) {
+    return null;
+  }
+  return hero.cost * Math.pow(2, level - 1);
+}
+
 export function canMerge(level: number): boolean {
   return level >= 1 && level < MAX_HERO_LEVEL;
 }

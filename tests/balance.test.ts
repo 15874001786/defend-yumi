@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BASE_UPGRADES, GRID_EXPANSIONS, INITIAL_GRID_CAPACITY, MAX_GRID_CAPACITY } from '../src/game/data/economy';
-import { calculateHeroStats, canMerge, HEROES, MAX_HERO_LEVEL } from '../src/game/data/heroes';
+import { calculateHeroStats, canMerge, directHeroUpgradeCost, HEROES, MAX_HERO_LEVEL } from '../src/game/data/heroes';
+import { findFlexiblePlacementCells } from '../src/game/data/placement';
 import { COMBAT_MONSTER_KINDS, DIFFICULTIES, MONSTER_KINDS, WAVES, getDifficultyConfig } from '../src/game/data/waves';
 
 describe('game balance tables', () => {
@@ -20,6 +21,14 @@ describe('game balance tables', () => {
     expect(canMerge(1)).toBe(true);
     expect(canMerge(8)).toBe(true);
     expect(canMerge(MAX_HERO_LEVEL)).toBe(false);
+  });
+
+  it('prices direct hero upgrades like buying an equivalent same-level copy', () => {
+    const hero = HEROES[0];
+    expect(directHeroUpgradeCost(hero, 1)).toBe(hero.cost);
+    expect(directHeroUpgradeCost(hero, 2)).toBe(hero.cost * 2);
+    expect(directHeroUpgradeCost(hero, 3)).toBe(hero.cost * 4);
+    expect(directHeroUpgradeCost(hero, MAX_HERO_LEVEL)).toBeNull();
   });
 
   it('scales hero stats upward with level and base upgrades', () => {
@@ -84,5 +93,17 @@ describe('game balance tables', () => {
       expect(upgrade.costs).toHaveLength(9);
       expect(upgrade.costs[8]).toBeGreaterThan(upgrade.costs[0]);
     }
+  });
+
+  it('places multi-cell heroes into any connected available shape', () => {
+    const cells = Array.from({ length: 6 }, (_, index) => ({
+      index,
+      row: Math.floor(index / 3),
+      col: index % 3,
+      available: index !== 1,
+    }));
+
+    expect(findFlexiblePlacementCells(cells, 3, 0)).toEqual([0, 3, 4]);
+    expect(findFlexiblePlacementCells(cells, 4, 0)).toEqual([0, 3, 4, 5]);
   });
 });

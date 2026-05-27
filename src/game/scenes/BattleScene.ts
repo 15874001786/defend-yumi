@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BASE_UPGRADES, BENCH_SIZE, crystalMaxHp, getBaseUpgradeCost, INITIAL_GOLD, INITIAL_GRID_CAPACITY, nextGridExpansion } from '../data/economy';
-import { calculateHeroStats, canMerge, getHeroDefinition, HEROES } from '../data/heroes';
+import { calculateHeroStats, canMerge, directHeroUpgradeCost, getHeroDefinition, HEROES } from '../data/heroes';
+import { findFlexiblePlacementCells } from '../data/placement';
 import { DIFFICULTIES, MONSTER_KINDS, WAVES, getDifficultyConfig } from '../data/waves';
 import type { BaseLevels, BaseUpgradeTrack, DifficultyId, HeroDefinition, HeroStats, MonsterKind, WaveConfig } from '../types';
 
@@ -16,7 +17,7 @@ const BOARD_GRID = {
   x: 156,
   y: 360,
 };
-const SELECTED_PANEL_Y = 1000;
+const SELECTED_PANEL_Y = 980;
 const BENCH_Y = 1116;
 const SHOP_Y = 1312;
 const ASSET_BASE = `${import.meta.env.BASE_URL}assets`;
@@ -279,7 +280,7 @@ export class BattleScene extends Phaser.Scene {
 
   preload(): void {
     for (const hero of HEROES) {
-      this.load.svg(`hero-${hero.id}`, `${ASSET_BASE}/heroes/${hero.id}.svg`, { width: 96, height: 112 });
+      this.load.image(`hero-${hero.id}`, `${ASSET_BASE}/heroes/rendered/${hero.id}.png`);
     }
     for (const monster of MONSTER_KINDS) {
       this.load.svg(`monster-${monster}`, `${ASSET_BASE}/monsters/${monster}.svg`, { width: 100, height: 112 });
@@ -446,8 +447,8 @@ export class BattleScene extends Phaser.Scene {
 
   private createHud(): void {
     const statCard = this.add.rectangle(154, 116, 248, 190, 0x142319, 0.92).setStrokeStyle(2, 0x8bcf8b, 0.28).setDepth(101);
-    const actionCard = this.add.rectangle(414, 116, 252, 190, 0x142018, 0.88).setStrokeStyle(2, 0xf2ca73, 0.22).setDepth(101);
-    const upgradeCard = this.add.rectangle(720, 116, 286, 190, 0x122019, 0.9).setStrokeStyle(2, 0x7dd8bc, 0.22).setDepth(101);
+    const actionCard = this.add.rectangle(414, 116, 286, 190, 0x142018, 0.88).setStrokeStyle(2, 0xf2ca73, 0.22).setDepth(101);
+    const upgradeCard = this.add.rectangle(736, 116, 252, 190, 0x122019, 0.9).setStrokeStyle(2, 0x7dd8bc, 0.22).setDepth(101);
     this.uiLayer.add([statCard, actionCard, upgradeCard]);
 
     this.add.text(42, 28, '资源', this.textStyle(16, '#9fc9b2', 800)).setDepth(102);
@@ -457,34 +458,28 @@ export class BattleScene extends Phaser.Scene {
     this.hudCapacity = this.add.text(42, 158, '', this.textStyle(19, '#cde9d2', 700)).setDepth(102);
 
     this.add.text(304, 29, '战斗控制', this.textStyle(17, '#fff4bd', 800)).setDepth(102);
-    const battleButton = this.createButton(362, 64, 106, 40, '开战', 0xe96b45, () => this.startNextWave(), 20, 6);
+    const battleButton = this.createButton(350, 64, 108, 42, '开战', 0xe96b45, () => this.startNextWave(), 20, 4);
     this.uiLayer.add(battleButton);
-    const battleHotspot = this.add.rectangle(362, 64, 120, 50, 0xffffff, 0.001).setDepth(126).setInteractive();
-    battleHotspot.on('pointerdown', () => {
-      this.tweens.add({ targets: battleButton, scale: 0.96, duration: 55, yoyo: true });
-      this.startNextWave();
-    });
-    this.uiLayer.add(battleHotspot);
 
-    const pauseButton = this.createButton(466, 64, 86, 40, '暂停', 0x49677b, () => this.togglePause(), 18, 5);
+    const pauseButton = this.createButton(482, 64, 108, 42, '暂停', 0x49677b, () => this.togglePause(), 18, 4);
     this.pauseLabel = pauseButton.getByName('label') as Phaser.GameObjects.Text;
     this.uiLayer.add(pauseButton);
 
-    const expandButton = this.createButton(414, 109, 210, 38, '', 0x4fb591, () => this.buyGridExpansion(), 17, 4);
+    const expandButton = this.createButton(416, 111, 240, 40, '', 0x4fb591, () => this.buyGridExpansion(), 17, 4);
     this.expandLabel = expandButton.getByName('label') as Phaser.GameObjects.Text;
     this.uiLayer.add(expandButton);
 
-    const saveButton = this.createButton(362, 151, 98, 34, '保存', 0x2d7363, () => this.saveGame(), 16, 4);
-    const loadButton = this.createButton(466, 151, 98, 34, '读取', 0x354c60, () => this.loadSavedGame(), 16, 4);
+    const saveButton = this.createButton(350, 156, 108, 36, '保存', 0x2d7363, () => this.saveGame(), 16, 4);
+    const loadButton = this.createButton(482, 156, 108, 36, '读取', 0x354c60, () => this.loadSavedGame(), 16, 4);
     this.uiLayer.add([saveButton, loadButton]);
 
     this.add.text(314, 188, '难度', this.textStyle(14, '#99c7ad', 800)).setDepth(102);
     DIFFICULTIES.forEach((difficulty, index) => {
       const active = difficulty.id === this.difficulty;
       const button = this.createButton(
-        374 + index * 49,
+        374 + index * 51,
         199,
-        42,
+        44,
         28,
         difficulty.shortName,
         active ? difficulty.color : 0x263b34,
@@ -496,11 +491,11 @@ export class BattleScene extends Phaser.Scene {
       this.uiLayer.add(button);
     });
 
-    this.add.text(588, 29, '基地升级', this.textStyle(17, '#fff4bd', 800)).setDepth(102);
+    this.add.text(622, 29, '基地升级', this.textStyle(17, '#fff4bd', 800)).setDepth(102);
     const positions: Array<[BaseUpgradeTrack['id'], number, number]> = [
-      ['attack', 720, 70],
-      ['speed', 720, 124],
-      ['crystal', 720, 178],
+      ['attack', 736, 70],
+      ['speed', 736, 124],
+      ['crystal', 736, 178],
     ];
 
     for (const [id, x, y] of positions) {
@@ -508,7 +503,7 @@ export class BattleScene extends Phaser.Scene {
       if (!upgrade) {
         continue;
       }
-      const button = this.createButton(x, y, 248, 40, '', 0x2d7363, () => this.buyBaseUpgrade(id), 15, 4);
+      const button = this.createButton(x, y, 218, 40, '', 0x2d7363, () => this.buyBaseUpgrade(id), 14, 4);
       this.baseLabels[id] = button.getByName('label') as Phaser.GameObjects.Text;
       this.uiLayer.add(button);
     }
@@ -898,60 +893,18 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private findPlacement(def: HeroDefinition, targetIndex: number, movingUnit?: HeroUnit): BoardLocation | undefined {
-    const target = this.slots[targetIndex];
-    const offsets = this.shapeOffsets(def.size);
-    const candidateAnchors = new Map<string, { row: number; col: number }>();
+    const cells = findFlexiblePlacementCells(
+      this.slots.map((slot) => ({
+        index: slot.index,
+        row: slot.row,
+        col: slot.col,
+        available: slot.index < this.gridCapacity && (!slot.occupant || slot.occupant.uid === movingUnit?.uid),
+      })),
+      def.size,
+      targetIndex,
+    );
 
-    for (const offset of offsets) {
-      const row = target.row - offset.row;
-      const col = target.col - offset.col;
-      candidateAnchors.set(`${row}:${col}`, { row, col });
-    }
-
-    for (let rowDelta = -1; rowDelta <= 1; rowDelta += 1) {
-      for (let colDelta = -1; colDelta <= 1; colDelta += 1) {
-        const row = target.row + rowDelta;
-        const col = target.col + colDelta;
-        candidateAnchors.set(`${row}:${col}`, { row, col });
-      }
-    }
-
-    const anchors = [...candidateAnchors.values()].sort((a, b) => (
-      Phaser.Math.Distance.Between(a.col, a.row, target.col, target.row)
-      - Phaser.Math.Distance.Between(b.col, b.row, target.col, target.row)
-    ));
-
-    for (const anchor of anchors) {
-      const cells: number[] = [];
-      let valid = true;
-      for (const offset of offsets) {
-        const slot = this.slotAt(anchor.row + offset.row, anchor.col + offset.col);
-        if (!slot || slot.index >= this.gridCapacity || (slot.occupant && slot.occupant.uid !== movingUnit?.uid)) {
-          valid = false;
-          break;
-        }
-        cells.push(slot.index);
-      }
-      if (valid) {
-        return { type: 'board', index: cells[0], cells };
-      }
-    }
-
-    return undefined;
-  }
-
-  private shapeOffsets(size: HeroDefinition['size']): Array<{ row: number; col: number }> {
-    if (size === 2) {
-      return [{ row: 0, col: 0 }, { row: 0, col: 1 }];
-    }
-    if (size === 3) {
-      return [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }];
-    }
-    return [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 1 }];
-  }
-
-  private slotAt(row: number, col: number): Slot | undefined {
-    return this.slots.find((slot) => slot.row === row && slot.col === col);
+    return cells ? { type: 'board', index: cells[0], cells } : undefined;
   }
 
   private usedCapacity(): number {
@@ -1957,6 +1910,24 @@ export class BattleScene extends Phaser.Scene {
     this.refreshAll();
   }
 
+  private buyHeroUpgrade(hero: HeroUnit): void {
+    if (!this.heroes.includes(hero)) {
+      return;
+    }
+    const cost = directHeroUpgradeCost(hero.def, hero.level);
+    if (cost === null) {
+      this.showMessage('英雄已达到最高等级。');
+      return;
+    }
+    if (!this.spendGold(cost)) {
+      return;
+    }
+    this.levelUpHero(hero);
+    this.selectedHero = hero;
+    this.showMessage(`${hero.def.name} 直接升到 Lv.${hero.level}`);
+    this.refreshAll();
+  }
+
   private spendGold(amount: number): boolean {
     if (this.gold < amount) {
       this.showMessage(`金币不足，还差 ${amount - this.gold}`);
@@ -2033,7 +2004,7 @@ export class BattleScene extends Phaser.Scene {
   private renderSelectedPanel(): void {
     this.selectedPanel?.destroy();
     const panel = this.add.container(WIDTH / 2, SELECTED_PANEL_Y).setDepth(130);
-    const bg = this.add.rectangle(0, 0, WIDTH - 64, 96, 0x141b17, 0.96).setStrokeStyle(2, 0xd6aa55, 0.28);
+    const bg = this.add.rectangle(0, 0, WIDTH - 64, 132, 0x141b17, 0.96).setStrokeStyle(2, 0xd6aa55, 0.28);
     panel.add(bg);
 
     if (!this.selectedHero || !this.heroes.includes(this.selectedHero)) {
@@ -2045,24 +2016,36 @@ export class BattleScene extends Phaser.Scene {
 
     const hero = this.selectedHero;
     const stats = this.statsFor(hero);
-    panel.add(this.add.image(-382, -2, `hero-${hero.def.id}`).setDisplaySize(58, 68));
-    panel.add(this.add.text(-340, -34, `${hero.def.name} Lv.${hero.level}`, this.textStyle(22, '#fff4c8', 900)));
-    panel.add(this.add.text(-340, -5, `伤害 ${stats.damage}  攻速 ${stats.attackRate}/秒  射程 ${stats.range}  生命 ${Math.ceil(hero.hp)}/${stats.maxHp}`, this.textStyle(15, '#c8e8d2', 700)));
-    panel.add(this.add.text(-340, 22, `3级：${hero.def.skills[0].name}${hero.level >= 3 ? ' 已觉醒' : ' 未觉醒'}`, this.textStyle(15, '#9fc9b2', 700)));
+    panel.add(this.add.image(-384, -4, `hero-${hero.def.id}`).setDisplaySize(72, 82));
+    panel.add(this.add.text(-336, -42, `${hero.def.name} Lv.${hero.level}`, this.textStyle(21, '#fff4c8', 900)));
+    panel.add(this.add.text(-336, -16, `伤害 ${stats.damage}  攻速 ${stats.attackRate}/秒  射程 ${stats.range}`, this.textStyle(14, '#c8e8d2', 700)));
+    panel.add(this.add.text(-336, 8, `生命 ${Math.ceil(hero.hp)}/${stats.maxHp}  3级：${hero.def.skills[0].name}${hero.level >= 3 ? ' 已觉醒' : ' 未觉醒'}`, this.textStyle(14, '#9fc9b2', 700)));
 
     const skill6 = hero.def.skills[1];
     const skill9 = hero.def.skills[2];
-    panel.add(this.createSkillButton(hero, 6, 126, -17, skill6.name, skill6.cost, hero.learned6));
-    panel.add(this.createSkillButton(hero, 9, 320, -17, skill9.name, skill9.cost, hero.learned9));
+    panel.add(this.createHeroUpgradeButton(hero, -30, 42));
+    panel.add(this.createSkillButton(hero, 6, 150, 42, skill6.name, skill6.cost, hero.learned6));
+    panel.add(this.createSkillButton(hero, 9, 322, 42, skill9.name, skill9.cost, hero.learned9));
 
     this.selectedPanel = panel;
+  }
+
+  private createHeroUpgradeButton(hero: HeroUnit, x: number, y: number): Phaser.GameObjects.Container {
+    const cost = directHeroUpgradeCost(hero.def, hero.level);
+    const available = cost !== null;
+    const label = available ? `升级 ${cost}金` : '已满级';
+    const button = this.createButton(x, y - 11, 154, 36, label, available ? 0x4fb591 : 0x314139, () => this.buyHeroUpgrade(hero), 15, 4);
+    const hint = this.add.text(x, y + 17, available ? `升至 Lv.${hero.level + 1}` : '最高等级', this.textStyle(13, available ? '#d9ffe8' : '#8ca598', 700)).setOrigin(0.5);
+    const container = this.add.container(0, 0);
+    container.add([button, hint]);
+    return container;
   }
 
   private createSkillButton(hero: HeroUnit, level: 6 | 9, x: number, y: number, name: string, cost: number, learned: boolean): Phaser.GameObjects.Container {
     const available = hero.level >= level && !learned;
     const label = learned ? `${level}级 已学` : `${level}级 ${cost}金`;
-    const button = this.createButton(x, y, 170, 48, label, available ? hero.def.color : 0x314139, () => this.learnSkill(hero, level), 16);
-    const nameText = this.add.text(x, y + 34, name, this.textStyle(14, available ? '#fff1bf' : '#8ca598', 700)).setOrigin(0.5);
+    const button = this.createButton(x, y - 11, 148, 36, label, available ? hero.def.color : 0x314139, () => this.learnSkill(hero, level), 14, 4);
+    const nameText = this.add.text(x, y + 17, name, this.textStyle(13, available ? '#fff1bf' : '#8ca598', 700)).setOrigin(0.5);
     const container = this.add.container(0, 0);
     container.add([button, nameText]);
     return container;
