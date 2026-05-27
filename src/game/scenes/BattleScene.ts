@@ -19,6 +19,7 @@ const BOARD_GRID = {
 const SELECTED_PANEL_Y = 1000;
 const BENCH_Y = 1116;
 const SHOP_Y = 1312;
+const ASSET_BASE = `${import.meta.env.BASE_URL}assets`;
 
 type BoardLocation = { type: 'board'; index: number; cells: number[] };
 type BenchLocation = { type: 'bench'; index: number };
@@ -145,12 +146,12 @@ export class BattleScene extends Phaser.Scene {
 
   preload(): void {
     for (const hero of HEROES) {
-      this.load.svg(`hero-${hero.id}`, `/assets/heroes/${hero.id}.svg`, { width: 96, height: 112 });
+      this.load.svg(`hero-${hero.id}`, `${ASSET_BASE}/heroes/${hero.id}.svg`, { width: 96, height: 112 });
     }
     for (const monster of ['scout', 'runner', 'brute', 'shield']) {
-      this.load.svg(`monster-${monster}`, `/assets/monsters/${monster}.svg`, { width: 100, height: 112 });
+      this.load.svg(`monster-${monster}`, `${ASSET_BASE}/monsters/${monster}.svg`, { width: 100, height: 112 });
     }
-    this.load.svg('crystal', '/assets/ui/crystal.svg', { width: 140, height: 170 });
+    this.load.svg('crystal', `${ASSET_BASE}/ui/crystal.svg`, { width: 140, height: 170 });
   }
 
   create(): void {
