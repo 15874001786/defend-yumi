@@ -20,6 +20,7 @@ const SELECTED_PANEL_Y = 1000;
 const BENCH_Y = 1116;
 const SHOP_Y = 1312;
 const ASSET_BASE = `${import.meta.env.BASE_URL}assets`;
+const SAVE_KEY = 'crystal-wardens-save-v2';
 
 type BoardLocation = { type: 'board'; index: number; cells: number[] };
 type BenchLocation = { type: 'bench'; index: number };
@@ -29,6 +30,7 @@ type Direction = WaveConfig['directions'][number];
 interface SceneInitData {
   difficulty?: DifficultyId;
   restartedByDifficulty?: boolean;
+  loadSave?: boolean;
 }
 
 interface Slot {
@@ -111,6 +113,71 @@ interface DragPayload {
   unitId?: number;
 }
 
+interface SavedStatus {
+  burnDps: number;
+  burnRemaining: number;
+  poisonDps: number;
+  poisonRemaining: number;
+  slowRemaining: number;
+  slowFactor: number;
+  stunRemaining: number;
+  vulnerableRemaining: number;
+  vulnerableMultiplier: number;
+}
+
+interface SavedHero {
+  uid: number;
+  defId: string;
+  level: number;
+  hp: number;
+  cooldown: number;
+  attackCounter: number;
+  learned6: boolean;
+  learned9: boolean;
+  reviveUsedWave: number;
+  location: HeroLocation;
+}
+
+interface SavedMonster {
+  uid: number;
+  kind: MonsterKind;
+  isGold: boolean;
+  hp: number;
+  maxHp: number;
+  speed: number;
+  damage: number;
+  reward: number;
+  x: number;
+  y: number;
+  path: Array<{ x: number; y: number }>;
+  pathIndex: number;
+  progress: number;
+  attackCooldown: number;
+  status: SavedStatus;
+}
+
+interface SavedGame {
+  version: 2;
+  savedAt: number;
+  difficulty: DifficultyId;
+  gold: number;
+  gridCapacity: number;
+  baseLevels: BaseLevels;
+  crystalHp: number;
+  currentWave: number;
+  heroUid: number;
+  monsterUid: number;
+  globalSpeedBuffRemaining: number;
+  isPaused: boolean;
+  activeWave?: {
+    wave: number;
+    spawned: number;
+    nextSpawnDelay: number;
+  };
+  heroes: SavedHero[];
+  monsters: SavedMonster[];
+}
+
 interface MonsterTypeStats {
   hp: number;
   speed: number;
@@ -129,8 +196,6 @@ const MONSTER_TYPE_STATS: Record<MonsterKind, MonsterTypeStats> = {
   golem: { hp: 2.42, speed: 0.66, reward: 1.75, damage: 1.65, scale: 0.96 },
   titan: { hp: 3.15, speed: 0.58, reward: 2.25, damage: 2.05, scale: 1.06 },
   goldling: { hp: 1.25, speed: 1.28, reward: 1.05, damage: 0, scale: 0.7 },
-  'gold-brute': { hp: 1.95, speed: 1.08, reward: 1.35, damage: 0, scale: 0.86 },
-  'gold-titan': { hp: 2.8, speed: 0.92, reward: 1.8, damage: 0, scale: 1 },
 };
 
 export class BattleScene extends Phaser.Scene {
@@ -168,6 +233,10 @@ export class BattleScene extends Phaser.Scene {
   private rangeText?: Phaser.GameObjects.Text;
   private difficulty: DifficultyId = 'easy';
   private pendingIntroMessage?: string;
+  private shouldLoadSave = false;
+  private isPaused = false;
+  private pausedAt = 0;
+  private pauseLabel!: Phaser.GameObjects.Text;
 
   constructor() {
     super('BattleScene');
@@ -175,6 +244,7 @@ export class BattleScene extends Phaser.Scene {
 
   init(data: SceneInitData = {}): void {
     this.difficulty = data.difficulty ?? this.difficulty;
+    this.shouldLoadSave = data.loadSave ?? false;
     this.resetRuntimeState();
     if (data.restartedByDifficulty) {
       this.pendingIntroMessage = `已切换为${getDifficultyConfig(this.difficulty).name}难度，战局重新开始`;
@@ -202,6 +272,8 @@ export class BattleScene extends Phaser.Scene {
     this.globalSpeedBuffUntil = 0;
     this.shopPage = 0;
     this.rangeText = undefined;
+    this.isPaused = false;
+    this.pausedAt = 0;
     this.pendingIntroMessage = undefined;
   }
 
@@ -217,6 +289,7 @@ export class BattleScene extends Phaser.Scene {
 
   create(): void {
     this.input.dragDistanceThreshold = 4;
+    this.input.topOnly = true;
     this.effectLayer = this.add.layer().setDepth(70);
     this.uiLayer = this.add.layer().setDepth(100);
     this.createBackground();
@@ -226,12 +299,15 @@ export class BattleScene extends Phaser.Scene {
     this.createBench();
     this.createShop();
     this.createDragHandlers();
+    if (this.shouldLoadSave) {
+      this.restoreSavedGame();
+    }
     this.refreshAll();
     this.showMessage(this.pendingIntroMessage ?? '先布阵，再点“开战”。商店英雄可拖到战斗区或备战区。');
   }
 
   update(time: number, delta: number): void {
-    if (this.gameEnded) {
+    if (this.gameEnded || this.isPaused) {
       return;
     }
 
@@ -369,9 +445,9 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createHud(): void {
-    const statCard = this.add.rectangle(170, 112, 280, 180, 0x142319, 0.92).setStrokeStyle(2, 0x8bcf8b, 0.28).setDepth(101);
-    const actionCard = this.add.rectangle(402, 116, 214, 180, 0x142018, 0.88).setStrokeStyle(2, 0xf2ca73, 0.22).setDepth(101);
-    const upgradeCard = this.add.rectangle(706, 116, 318, 180, 0x122019, 0.9).setStrokeStyle(2, 0x7dd8bc, 0.22).setDepth(101);
+    const statCard = this.add.rectangle(154, 116, 248, 190, 0x142319, 0.92).setStrokeStyle(2, 0x8bcf8b, 0.28).setDepth(101);
+    const actionCard = this.add.rectangle(414, 116, 252, 190, 0x142018, 0.88).setStrokeStyle(2, 0xf2ca73, 0.22).setDepth(101);
+    const upgradeCard = this.add.rectangle(720, 116, 286, 190, 0x122019, 0.9).setStrokeStyle(2, 0x7dd8bc, 0.22).setDepth(101);
     this.uiLayer.add([statCard, actionCard, upgradeCard]);
 
     this.add.text(42, 28, '资源', this.textStyle(16, '#9fc9b2', 800)).setDepth(102);
@@ -380,27 +456,36 @@ export class BattleScene extends Phaser.Scene {
     this.hudCrystal = this.add.text(42, 126, '', this.textStyle(20, '#9dfff0', 800)).setDepth(102);
     this.hudCapacity = this.add.text(42, 158, '', this.textStyle(19, '#cde9d2', 700)).setDepth(102);
 
-    this.add.text(326, 35, '战斗控制', this.textStyle(17, '#fff4bd', 800)).setDepth(102);
-    const battleButton = this.createButton(402, 68, 178, 48, '开战', 0xe96b45, () => this.startNextWave(), 21, 14);
+    this.add.text(304, 29, '战斗控制', this.textStyle(17, '#fff4bd', 800)).setDepth(102);
+    const battleButton = this.createButton(362, 64, 106, 40, '开战', 0xe96b45, () => this.startNextWave(), 20, 6);
     this.uiLayer.add(battleButton);
-    const battleHotspot = this.add.rectangle(402, 68, 236, 72, 0xffffff, 0.001).setDepth(126).setInteractive();
+    const battleHotspot = this.add.rectangle(362, 64, 120, 50, 0xffffff, 0.001).setDepth(126).setInteractive();
     battleHotspot.on('pointerdown', () => {
       this.tweens.add({ targets: battleButton, scale: 0.96, duration: 55, yoyo: true });
       this.startNextWave();
     });
     this.uiLayer.add(battleHotspot);
 
-    const expandButton = this.createButton(402, 126, 178, 40, '', 0x4fb591, () => this.buyGridExpansion(), 17, 6);
+    const pauseButton = this.createButton(466, 64, 86, 40, '暂停', 0x49677b, () => this.togglePause(), 18, 5);
+    this.pauseLabel = pauseButton.getByName('label') as Phaser.GameObjects.Text;
+    this.uiLayer.add(pauseButton);
+
+    const expandButton = this.createButton(414, 109, 210, 38, '', 0x4fb591, () => this.buyGridExpansion(), 17, 4);
     this.expandLabel = expandButton.getByName('label') as Phaser.GameObjects.Text;
     this.uiLayer.add(expandButton);
-    this.add.text(314, 161, '难度', this.textStyle(14, '#99c7ad', 800)).setDepth(102);
+
+    const saveButton = this.createButton(362, 151, 98, 34, '保存', 0x2d7363, () => this.saveGame(), 16, 4);
+    const loadButton = this.createButton(466, 151, 98, 34, '读取', 0x354c60, () => this.loadSavedGame(), 16, 4);
+    this.uiLayer.add([saveButton, loadButton]);
+
+    this.add.text(314, 188, '难度', this.textStyle(14, '#99c7ad', 800)).setDepth(102);
     DIFFICULTIES.forEach((difficulty, index) => {
       const active = difficulty.id === this.difficulty;
       const button = this.createButton(
-        370 + index * 50,
-        183,
+        374 + index * 49,
+        199,
         42,
-        30,
+        28,
         difficulty.shortName,
         active ? difficulty.color : 0x263b34,
         () => this.changeDifficulty(difficulty.id),
@@ -411,11 +496,11 @@ export class BattleScene extends Phaser.Scene {
       this.uiLayer.add(button);
     });
 
-    this.add.text(558, 35, '基地升级', this.textStyle(17, '#fff4bd', 800)).setDepth(102);
+    this.add.text(588, 29, '基地升级', this.textStyle(17, '#fff4bd', 800)).setDepth(102);
     const positions: Array<[BaseUpgradeTrack['id'], number, number]> = [
-      ['attack', 706, 72],
-      ['speed', 706, 122],
-      ['crystal', 706, 172],
+      ['attack', 720, 70],
+      ['speed', 720, 124],
+      ['crystal', 720, 178],
     ];
 
     for (const [id, x, y] of positions) {
@@ -423,7 +508,7 @@ export class BattleScene extends Phaser.Scene {
       if (!upgrade) {
         continue;
       }
-      const button = this.createButton(x, y, 278, 40, '', 0x2d7363, () => this.buyBaseUpgrade(id), 16);
+      const button = this.createButton(x, y, 248, 40, '', 0x2d7363, () => this.buyBaseUpgrade(id), 15, 4);
       this.baseLabels[id] = button.getByName('label') as Phaser.GameObjects.Text;
       this.uiLayer.add(button);
     }
@@ -1466,6 +1551,295 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
+  private togglePause(): void {
+    if (this.gameEnded) {
+      return;
+    }
+    if (this.isPaused) {
+      this.resumeGame();
+    } else {
+      this.pauseGame();
+    }
+  }
+
+  private pauseGame(): void {
+    if (this.isPaused) {
+      return;
+    }
+    this.isPaused = true;
+    this.pausedAt = this.time.now;
+    this.pauseLabel?.setText('继续');
+    this.showMessage('已暂停，拖拽和升级仍可操作');
+  }
+
+  private resumeGame(): void {
+    if (!this.isPaused) {
+      return;
+    }
+    const pausedFor = Math.max(0, this.time.now - this.pausedAt);
+    this.shiftTimedEffects(pausedFor);
+    this.isPaused = false;
+    this.pausedAt = 0;
+    this.pauseLabel?.setText('暂停');
+    this.showMessage('继续战斗');
+  }
+
+  private shiftTimedEffects(duration: number): void {
+    if (duration <= 0) {
+      return;
+    }
+    if (this.activeWave) {
+      this.activeWave.nextSpawnAt += duration;
+    }
+    if (this.globalSpeedBuffUntil > 0) {
+      this.globalSpeedBuffUntil += duration;
+    }
+    for (const monster of this.monsters) {
+      for (const key of ['burnUntil', 'poisonUntil', 'slowUntil', 'stunUntil', 'vulnerableUntil'] as const) {
+        if (monster.status[key] > 0) {
+          monster.status[key] += duration;
+        }
+      }
+    }
+  }
+
+  private saveReferenceTime(): number {
+    return this.isPaused ? this.pausedAt : this.time.now;
+  }
+
+  private saveRemaining(until: number, referenceTime: number): number {
+    return Math.max(0, until - referenceTime);
+  }
+
+  private saveGame(): void {
+    const referenceTime = this.saveReferenceTime();
+    const saved: SavedGame = {
+      version: 2,
+      savedAt: Date.now(),
+      difficulty: this.difficulty,
+      gold: this.gold,
+      gridCapacity: this.gridCapacity,
+      baseLevels: { ...this.baseLevels },
+      crystalHp: this.crystalHp,
+      currentWave: this.currentWave,
+      heroUid: this.heroUid,
+      monsterUid: this.monsterUid,
+      globalSpeedBuffRemaining: this.saveRemaining(this.globalSpeedBuffUntil, referenceTime),
+      isPaused: this.isPaused,
+      activeWave: this.activeWave
+        ? {
+            wave: this.activeWave.config.wave,
+            spawned: this.activeWave.spawned,
+            nextSpawnDelay: Math.max(240, this.activeWave.nextSpawnAt - referenceTime),
+          }
+        : undefined,
+      heroes: this.heroes.map((hero) => ({
+        uid: hero.uid,
+        defId: hero.def.id,
+        level: hero.level,
+        hp: hero.hp,
+        cooldown: hero.cooldown,
+        attackCounter: hero.attackCounter,
+        learned6: hero.learned6,
+        learned9: hero.learned9,
+        reviveUsedWave: hero.reviveUsedWave,
+        location: hero.location,
+      })),
+      monsters: this.monsters.map((monster) => ({
+        uid: monster.uid,
+        kind: monster.kind,
+        isGold: monster.isGold,
+        hp: monster.hp,
+        maxHp: monster.maxHp,
+        speed: monster.speed,
+        damage: monster.damage,
+        reward: monster.reward,
+        x: monster.container.x,
+        y: monster.container.y,
+        path: monster.path.map((point) => ({ x: point.x, y: point.y })),
+        pathIndex: monster.pathIndex,
+        progress: monster.progress,
+        attackCooldown: monster.attackCooldown,
+        status: {
+          burnDps: monster.status.burnDps,
+          burnRemaining: this.saveRemaining(monster.status.burnUntil, referenceTime),
+          poisonDps: monster.status.poisonDps,
+          poisonRemaining: this.saveRemaining(monster.status.poisonUntil, referenceTime),
+          slowRemaining: this.saveRemaining(monster.status.slowUntil, referenceTime),
+          slowFactor: monster.status.slowFactor,
+          stunRemaining: this.saveRemaining(monster.status.stunUntil, referenceTime),
+          vulnerableRemaining: this.saveRemaining(monster.status.vulnerableUntil, referenceTime),
+          vulnerableMultiplier: monster.status.vulnerableMultiplier,
+        },
+      })),
+    };
+
+    try {
+      window.localStorage.setItem(SAVE_KEY, JSON.stringify(saved));
+      this.showMessage(`已保存进度：${getDifficultyConfig(this.difficulty).name} · 第 ${this.currentWave}/${WAVES.length} 波`);
+    } catch {
+      this.showMessage('保存失败：当前浏览器本地存储不可用或空间不足');
+    }
+  }
+
+  private loadSavedGame(): void {
+    try {
+      if (!window.localStorage.getItem(SAVE_KEY)) {
+        this.showMessage('暂无本地存档');
+        return;
+      }
+    } catch {
+      this.showMessage('读取失败：当前浏览器无法访问本地存储');
+      return;
+    }
+    this.scene.restart({ loadSave: true } satisfies SceneInitData);
+  }
+
+  private restoreSavedGame(): void {
+    try {
+      const raw = window.localStorage.getItem(SAVE_KEY);
+      if (!raw) {
+        this.pendingIntroMessage = '暂无本地存档';
+        return;
+      }
+      const saved = JSON.parse(raw) as SavedGame;
+      if (saved.version !== 2) {
+        this.pendingIntroMessage = '存档版本过旧，请重新开始一局';
+        return;
+      }
+      this.applySavedGame(saved);
+      this.pendingIntroMessage = `已读取本地存档：${getDifficultyConfig(this.difficulty).name} · 第 ${this.currentWave}/${WAVES.length} 波`;
+    } catch {
+      this.pendingIntroMessage = '读取失败：存档数据损坏';
+    }
+  }
+
+  private applySavedGame(saved: SavedGame): void {
+    const now = this.time.now;
+    this.difficulty = saved.difficulty;
+    this.gold = Math.max(0, Math.floor(saved.gold));
+    this.gridCapacity = Phaser.Math.Clamp(saved.gridCapacity, INITIAL_GRID_CAPACITY, this.slots.length);
+    this.baseLevels = {
+      attack: Phaser.Math.Clamp(saved.baseLevels.attack, 0, 9),
+      speed: Phaser.Math.Clamp(saved.baseLevels.speed, 0, 9),
+      crystal: Phaser.Math.Clamp(saved.baseLevels.crystal, 0, 9),
+    };
+    this.crystalHp = Phaser.Math.Clamp(saved.crystalHp, 1, crystalMaxHp(this.baseLevels.crystal));
+    this.currentWave = Phaser.Math.Clamp(saved.currentWave, 0, WAVES.length);
+    this.heroUid = Math.max(1, saved.heroUid);
+    this.monsterUid = Math.max(1, saved.monsterUid);
+    this.globalSpeedBuffUntil = saved.globalSpeedBuffRemaining > 0 ? now + saved.globalSpeedBuffRemaining : 0;
+
+    for (const hero of saved.heroes) {
+      const def = getHeroDefinition(hero.defId);
+      const location = this.validSavedLocation(hero.location, def);
+      if (!location) {
+        continue;
+      }
+      const unit = this.createHeroUnit(def, location);
+      unit.uid = hero.uid;
+      unit.level = Phaser.Math.Clamp(hero.level, 1, 9);
+      unit.hp = Phaser.Math.Clamp(hero.hp, 1, this.statsFor(unit).maxHp);
+      unit.cooldown = Math.max(0, hero.cooldown);
+      unit.attackCounter = Math.max(0, hero.attackCounter);
+      unit.learned6 = hero.learned6;
+      unit.learned9 = hero.learned9;
+      unit.reviveUsedWave = hero.reviveUsedWave;
+      unit.container.setData('payload', { kind: 'hero', unitId: unit.uid } satisfies DragPayload);
+      this.heroUid = Math.max(this.heroUid, unit.uid + 1);
+      this.refreshHeroVisual(unit);
+    }
+
+    if (saved.activeWave) {
+      const config = WAVES[saved.activeWave.wave - 1];
+      if (config) {
+        this.activeWave = {
+          config,
+          spawned: Phaser.Math.Clamp(saved.activeWave.spawned, 0, config.count),
+          nextSpawnAt: now + Math.max(240, saved.activeWave.nextSpawnDelay),
+        };
+      }
+    }
+
+    for (const monster of saved.monsters) {
+      this.restoreMonster(monster, now);
+      this.monsterUid = Math.max(this.monsterUid, monster.uid + 1);
+    }
+
+    this.isPaused = saved.isPaused;
+    this.pausedAt = saved.isPaused ? now : 0;
+    this.pauseLabel?.setText(saved.isPaused ? '继续' : '暂停');
+  }
+
+  private validSavedLocation(location: HeroLocation, def: HeroDefinition): HeroLocation | undefined {
+    if (location.type === 'board') {
+      const cells = Array.isArray(location.cells) ? location.cells : [];
+      const valid = cells.length === def.size
+        && cells.every((cell) => Number.isInteger(cell) && cell >= 0 && cell < this.gridCapacity && !this.slots[cell]?.occupant);
+      if (valid) {
+        return { type: 'board', index: cells[0], cells: [...cells] };
+      }
+    }
+
+    if (location.type === 'bench' && Number.isInteger(location.index) && !this.benchSlots[location.index]?.occupant) {
+      return { type: 'bench', index: location.index };
+    }
+
+    const emptyBench = this.benchSlots.find((slot) => !slot.occupant);
+    if (emptyBench) {
+      return { type: 'bench', index: emptyBench.index };
+    }
+    return this.findPlacement(def, 0);
+  }
+
+  private restoreMonster(saved: SavedMonster, now: number): void {
+    const mod = MONSTER_TYPE_STATS[saved.kind];
+    if (!mod) {
+      return;
+    }
+    const tier = Math.min(4, Math.floor(Math.max(0, this.currentWave - 1) / 4));
+    const container = this.add.container(saved.x, saved.y).setDepth(40);
+    const aura = this.add.ellipse(0, -18, 84 + tier * 8, 72 + tier * 7, saved.isGold ? 0xffd36e : 0x92ffb8, saved.isGold ? 0.2 : 0.05 + tier * 0.025);
+    const sprite = this.add.image(0, -18, `monster-${saved.kind}`).setScale(mod.scale);
+    const hpBack = this.add.rectangle(-34, 45, 68, 7, 0x111111, 0.82).setOrigin(0, 0.5);
+    const hpFill = this.add.rectangle(-34, 45, 68, 7, saved.isGold ? 0xffd36e : 0xff6b5c, 1).setOrigin(0, 0.5);
+    const badge = this.add.text(0, -78, saved.isGold ? '金币' : `Lv.${Math.max(1, this.currentWave)}`, this.textStyle(13, saved.isGold ? '#fff1a6' : '#e7fff1', 900)).setOrigin(0.5).setAlpha(saved.isGold ? 1 : 0.72);
+    container.add([aura, sprite, hpBack, hpFill, badge]);
+
+    const monster: MonsterUnit = {
+      uid: saved.uid,
+      kind: saved.kind,
+      isGold: saved.isGold,
+      hp: saved.hp,
+      maxHp: saved.maxHp,
+      speed: saved.speed,
+      damage: saved.damage,
+      reward: saved.reward,
+      path: saved.path.map((point) => new Phaser.Math.Vector2(point.x, point.y)),
+      pathIndex: saved.pathIndex,
+      progress: saved.progress,
+      attackCooldown: saved.attackCooldown,
+      attackingCrystal: false,
+      dead: false,
+      container,
+      sprite,
+      hpFill,
+      status: {
+        burnDps: saved.status.burnDps,
+        burnUntil: saved.status.burnRemaining > 0 ? now + saved.status.burnRemaining : 0,
+        poisonDps: saved.status.poisonDps,
+        poisonUntil: saved.status.poisonRemaining > 0 ? now + saved.status.poisonRemaining : 0,
+        slowUntil: saved.status.slowRemaining > 0 ? now + saved.status.slowRemaining : 0,
+        slowFactor: saved.status.slowFactor,
+        stunUntil: saved.status.stunRemaining > 0 ? now + saved.status.stunRemaining : 0,
+        vulnerableUntil: saved.status.vulnerableRemaining > 0 ? now + saved.status.vulnerableRemaining : 0,
+        vulnerableMultiplier: saved.status.vulnerableMultiplier,
+      },
+    };
+    this.monsters.push(monster);
+    this.refreshMonsterVisual(monster);
+  }
+
   private changeDifficulty(difficulty: DifficultyId): void {
     if (difficulty === this.difficulty) {
       this.showMessage(`当前已是${getDifficultyConfig(difficulty).name}难度`);
@@ -1475,6 +1849,10 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private startNextWave(): void {
+    if (this.isPaused) {
+      this.showMessage('当前已暂停，点击“继续”后再开战');
+      return;
+    }
     if (this.activeWave || this.gameEnded) {
       if (this.activeWave) {
         this.showMessage(`第 ${this.currentWave} 波正在战斗中`);
@@ -1637,9 +2015,10 @@ export class BattleScene extends Phaser.Scene {
     this.hudWave.setText(`波次 ${this.currentWave}/${WAVES.length} · ${difficulty.name}`);
     this.hudCrystal.setText(`晶核 ${Math.ceil(this.crystalHp)}/${crystalMaxHp(this.baseLevels.crystal)}`);
     this.hudCapacity.setText(`战斗容量 ${this.usedCapacity()}/${this.gridCapacity}`);
+    this.pauseLabel?.setText(this.isPaused ? '继续' : '暂停');
 
     const expansion = nextGridExpansion(this.gridCapacity);
-    this.expandLabel.setText(expansion ? `扩容 +${expansion.to - expansion.from}  ${expansion.cost}金` : '容量已满');
+    this.expandLabel.setText(expansion ? `扩容格子 +${expansion.to - expansion.from}  ${expansion.cost}金` : '容量已满');
 
     for (const upgrade of BASE_UPGRADES) {
       const level = this.baseLevels[upgrade.id];

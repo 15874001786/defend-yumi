@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,6 +10,18 @@ const uiDir = join(root, 'public', 'assets', 'ui');
 mkdirSync(heroDir, { recursive: true });
 mkdirSync(monsterDir, { recursive: true });
 mkdirSync(uiDir, { recursive: true });
+
+function cleanSvgDir(dir) {
+  for (const file of readdirSync(dir)) {
+    if (file.endsWith('.svg')) {
+      unlinkSync(join(dir, file));
+    }
+  }
+}
+
+cleanSvgDir(heroDir);
+cleanSvgDir(monsterDir);
+cleanSvgDir(uiDir);
 
 const heroes = [
   ['ember-warden', '#f06a3a', '#ffc15f', '#351513', '火', 'M42 24 C56 34 67 48 64 67 C61 86 47 96 32 93 C46 76 28 66 40 48 C45 40 38 34 42 24 Z'],
@@ -64,8 +76,6 @@ const monsters = [
   ['golem', '#4f6d63', '#b9f0ce', 'M18 32 L41 14 L68 18 L86 42 L82 80 L62 103 L36 100 L15 76 Z'],
   ['titan', '#2f3342', '#ff9a74', 'M11 48 L30 16 H70 L89 48 L79 91 L50 108 L21 91 Z'],
   ['goldling', '#d68a25', '#fff0a8', 'M20 66 C20 36 35 18 50 18 C66 18 80 36 80 66 C80 88 67 101 50 101 C33 101 20 88 20 66 Z'],
-  ['gold-brute', '#b56b1f', '#ffe37a', 'M12 58 C12 29 31 12 52 12 C75 12 88 31 88 58 C88 88 72 105 52 105 C29 105 12 88 12 58 Z'],
-  ['gold-titan', '#8c561c', '#fff4bd', 'M50 8 L86 28 L92 65 L74 99 L50 108 L26 99 L8 65 L14 28 Z'],
 ];
 
 function monsterSvg([id, main, accent, shape]) {

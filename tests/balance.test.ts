@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BASE_UPGRADES, GRID_EXPANSIONS, INITIAL_GRID_CAPACITY, MAX_GRID_CAPACITY } from '../src/game/data/economy';
 import { calculateHeroStats, canMerge, HEROES, MAX_HERO_LEVEL } from '../src/game/data/heroes';
-import { DIFFICULTIES, WAVES, getDifficultyConfig } from '../src/game/data/waves';
+import { COMBAT_MONSTER_KINDS, DIFFICULTIES, MONSTER_KINDS, WAVES, getDifficultyConfig } from '../src/game/data/waves';
 
 describe('game balance tables', () => {
   it('defines 12 unique heroes with complete skill ladders', () => {
@@ -50,11 +50,18 @@ describe('game balance tables', () => {
     }
   });
 
-  it('escalates monster models and stats across the campaign', () => {
-    expect(new Set(WAVES.flatMap((wave) => wave.types)).size).toBeGreaterThanOrEqual(8);
+  it('uses exactly 9 monster types and blends adjacent combat types by wave', () => {
+    expect(MONSTER_KINDS).toHaveLength(9);
+    expect(COMBAT_MONSTER_KINDS).toHaveLength(8);
+    expect(WAVES[0].types).toEqual(['scout']);
+    expect(WAVES[1].types).toEqual(['scout', 'runner']);
+    expect(WAVES[2].types).toEqual(['runner', 'brute']);
+    expect(WAVES[4].types).toEqual(['brute', 'shield']);
+    expect(WAVES[9].types).toEqual(['golem', 'titan']);
+    expect(new Set(WAVES.flatMap((wave) => wave.types)).size).toBe(9);
     expect(WAVES[0].hp).toBeLessThan(WAVES[18].hp);
     expect(WAVES[0].speed).toBeLessThan(WAVES[18].speed);
-    expect(WAVES[16].types).toContain('titan');
+    expect(WAVES[10].types).toContain('titan');
   });
 
   it('defines three difficulty tiers with stricter rewards upward', () => {

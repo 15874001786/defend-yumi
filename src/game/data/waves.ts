@@ -46,25 +46,20 @@ export const MONSTER_KINDS: MonsterKind[] = [
   'golem',
   'titan',
   'goldling',
-  'gold-brute',
-  'gold-titan',
 ];
 
-const NORMAL_ROSTERS: MonsterKind[][] = [
-  ['scout', 'runner'],
-  ['runner', 'brute', 'raider'],
-  ['shield', 'runner', 'wraith'],
-  ['golem', 'shield', 'wraith'],
-  ['titan', 'golem', 'wraith', 'shield'],
+export const COMBAT_MONSTER_KINDS: MonsterKind[] = [
+  'scout',
+  'runner',
+  'brute',
+  'shield',
+  'raider',
+  'wraith',
+  'golem',
+  'titan',
 ];
 
-const GOLD_ROSTERS: MonsterKind[][] = [
-  ['goldling'],
-  ['goldling', 'gold-brute'],
-  ['goldling', 'gold-brute'],
-  ['gold-brute', 'gold-titan'],
-  ['gold-brute', 'gold-titan'],
-];
+export const GOLD_MONSTER_KIND: MonsterKind = 'goldling';
 
 export function getDifficultyConfig(id: DifficultyId): DifficultyConfig {
   return DIFFICULTIES.find((difficulty) => difficulty.id === id) ?? DIFFICULTIES[0];
@@ -72,8 +67,14 @@ export function getDifficultyConfig(id: DifficultyId): DifficultyConfig {
 
 export const WAVES: WaveConfig[] = Array.from({ length: 20 }, (_, index) => {
   const wave = index + 1;
-  const tier = Math.min(4, Math.floor(index / 4));
   const isGoldWave = wave % 4 === 0;
+  const tier = Math.min(4, Math.floor(index / 4));
+  const combatWave = wave - Math.floor(wave / 4);
+  const currentTypeIndex = Math.min(COMBAT_MONSTER_KINDS.length - 1, combatWave - 1);
+  const previousTypeIndex = Math.max(0, currentTypeIndex - 1);
+  const normalTypes = combatWave === 1
+    ? [COMBAT_MONSTER_KINDS[0]]
+    : [COMBAT_MONSTER_KINDS[previousTypeIndex], COMBAT_MONSTER_KINDS[currentTypeIndex]];
   const baseHp = Math.round(88 * Math.pow(1.19, index) + wave * 18 + tier * 44);
   const baseReward = 14 + wave * 4 + tier * 10;
 
@@ -88,6 +89,6 @@ export const WAVES: WaveConfig[] = Array.from({ length: 20 }, (_, index) => {
     reward: Math.round(baseReward * (isGoldWave ? 3.1 + tier * 0.2 : 1)),
     spawnEveryMs: Math.max(isGoldWave ? 255 : 320, (isGoldWave ? 650 : 820) - wave * (isGoldWave ? 16 : 20) - tier * 16),
     directions: ['left'],
-    types: isGoldWave ? GOLD_ROSTERS[tier] : NORMAL_ROSTERS[tier],
+    types: isGoldWave ? [GOLD_MONSTER_KIND] : normalTypes,
   };
 });

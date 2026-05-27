@@ -82,9 +82,7 @@ export type MonsterKind =
   | 'wraith'
   | 'golem'
   | 'titan'
-  | 'goldling'
-  | 'gold-brute'
-  | 'gold-titan';
+  | 'goldling';
 
 export interface WaveConfig {
   wave: number;
