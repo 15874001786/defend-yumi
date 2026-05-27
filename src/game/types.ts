@@ -59,8 +59,37 @@ export interface BaseUpgradeTrack {
   perLevel: number;
 }
 
+export type DifficultyId = 'easy' | 'hard' | 'nightmare';
+
+export interface DifficultyConfig {
+  id: DifficultyId;
+  name: string;
+  shortName: string;
+  hpMultiplier: number;
+  speedMultiplier: number;
+  rewardMultiplier: number;
+  clearRewardMultiplier: number;
+  color: number;
+  description: string;
+}
+
+export type MonsterKind =
+  | 'scout'
+  | 'runner'
+  | 'brute'
+  | 'shield'
+  | 'raider'
+  | 'wraith'
+  | 'golem'
+  | 'titan'
+  | 'goldling'
+  | 'gold-brute'
+  | 'gold-titan';
+
 export interface WaveConfig {
   wave: number;
+  stageName: string;
+  isGoldWave: boolean;
   count: number;
   hp: number;
   speed: number;
@@ -68,7 +97,7 @@ export interface WaveConfig {
   reward: number;
   spawnEveryMs: number;
   directions: Array<'top' | 'right' | 'bottom' | 'left'>;
-  types: Array<'scout' | 'brute' | 'runner' | 'shield'>;
+  types: MonsterKind[];
 }
 
 export interface HeroStats {

@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 112">
   <defs>
     <linearGradient id="m" x1="20%" y1="0%" x2="80%" y2="100%">
-      <stop offset="0%" stop-color="#d7edf1"/>
-      <stop offset="100%" stop-color="#53606d"/>
+      <stop offset="0%" stop-color="#b9f0ce"/>
+      <stop offset="100%" stop-color="#4f6d63"/>
     </linearGradient>
     <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
       <feDropShadow dx="0" dy="8" stdDeviation="5" flood-color="#000" flood-opacity=".5"/>
@@ -10,8 +10,8 @@
   </defs>
   <ellipse cx="50" cy="101" rx="31" ry="7" fill="#050706" opacity=".45"/>
   <g filter="url(#shadow)">
-    <path d="M50 10 L86 28 L80 73 C75 94 62 104 50 107 C38 104 25 94 20 73 L14 28 Z" fill="url(#m)" stroke="#231816" stroke-width="4" stroke-linejoin="round"/>
-    
+    <path d="M18 32 L41 14 L68 18 L86 42 L82 80 L62 103 L36 100 L15 76 Z" fill="url(#m)" stroke="#231816" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M25 41 H75 M19 65 H83 M35 18 L31 96 M66 21 L70 94" stroke="#1b2521" stroke-opacity=".34" stroke-width="4"/>
     
     <circle cx="38" cy="53" r="5" fill="#211211"/>
     <circle cx="63" cy="53" r="5" fill="#211211"/>

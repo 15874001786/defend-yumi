@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { BASE_UPGRADES, BENCH_SIZE, crystalMaxHp, getBaseUpgradeCost, INITIAL_GOLD, INITIAL_GRID_CAPACITY, nextGridExpansion } from '../data/economy';
 import { calculateHeroStats, canMerge, getHeroDefinition, HEROES } from '../data/heroes';
-import { WAVES } from '../data/waves';
-import type { BaseLevels, BaseUpgradeTrack, HeroDefinition, HeroStats, WaveConfig } from '../types';
+import { DIFFICULTIES, MONSTER_KINDS, WAVES, getDifficultyConfig } from '../data/waves';
+import type { BaseLevels, BaseUpgradeTrack, DifficultyId, HeroDefinition, HeroStats, MonsterKind, WaveConfig } from '../types';
 
 const WIDTH = 900;
 const HEIGHT = 1600;
@@ -25,7 +25,11 @@ type BoardLocation = { type: 'board'; index: number; cells: number[] };
 type BenchLocation = { type: 'bench'; index: number };
 type HeroLocation = BoardLocation | BenchLocation;
 type Direction = WaveConfig['directions'][number];
-type MonsterKind = WaveConfig['types'][number];
+
+interface SceneInitData {
+  difficulty?: DifficultyId;
+  restartedByDifficulty?: boolean;
+}
 
 interface Slot {
   index: number;
@@ -76,6 +80,7 @@ interface MonsterStatus {
 interface MonsterUnit {
   uid: number;
   kind: MonsterKind;
+  isGold: boolean;
   hp: number;
   maxHp: number;
   speed: number;
@@ -105,6 +110,28 @@ interface DragPayload {
   heroId?: string;
   unitId?: number;
 }
+
+interface MonsterTypeStats {
+  hp: number;
+  speed: number;
+  reward: number;
+  damage: number;
+  scale: number;
+}
+
+const MONSTER_TYPE_STATS: Record<MonsterKind, MonsterTypeStats> = {
+  scout: { hp: 1, speed: 1, reward: 1, damage: 1, scale: 0.72 },
+  runner: { hp: 0.72, speed: 1.45, reward: 0.9, damage: 0.82, scale: 0.66 },
+  brute: { hp: 1.72, speed: 0.72, reward: 1.32, damage: 1.35, scale: 0.86 },
+  shield: { hp: 2.05, speed: 0.82, reward: 1.55, damage: 1.48, scale: 0.9 },
+  raider: { hp: 1.08, speed: 1.18, reward: 1.12, damage: 1.08, scale: 0.75 },
+  wraith: { hp: 0.95, speed: 1.32, reward: 1.24, damage: 1.18, scale: 0.74 },
+  golem: { hp: 2.42, speed: 0.66, reward: 1.75, damage: 1.65, scale: 0.96 },
+  titan: { hp: 3.15, speed: 0.58, reward: 2.25, damage: 2.05, scale: 1.06 },
+  goldling: { hp: 1.25, speed: 1.28, reward: 1.05, damage: 0, scale: 0.7 },
+  'gold-brute': { hp: 1.95, speed: 1.08, reward: 1.35, damage: 0, scale: 0.86 },
+  'gold-titan': { hp: 2.8, speed: 0.92, reward: 1.8, damage: 0, scale: 1 },
+};
 
 export class BattleScene extends Phaser.Scene {
   private boardGraphics!: Phaser.GameObjects.Graphics;
@@ -139,16 +166,50 @@ export class BattleScene extends Phaser.Scene {
   private shopPage = 0;
   private shopPageText!: Phaser.GameObjects.Text;
   private rangeText?: Phaser.GameObjects.Text;
+  private difficulty: DifficultyId = 'easy';
+  private pendingIntroMessage?: string;
 
   constructor() {
     super('BattleScene');
+  }
+
+  init(data: SceneInitData = {}): void {
+    this.difficulty = data.difficulty ?? this.difficulty;
+    this.resetRuntimeState();
+    if (data.restartedByDifficulty) {
+      this.pendingIntroMessage = `已切换为${getDifficultyConfig(this.difficulty).name}难度，战局重新开始`;
+    }
+  }
+
+  private resetRuntimeState(): void {
+    this.slots = [];
+    this.benchSlots = [];
+    this.heroes = [];
+    this.monsters = [];
+    this.shopCards = [];
+    this.gold = INITIAL_GOLD;
+    this.gridCapacity = INITIAL_GRID_CAPACITY;
+    this.baseLevels = { attack: 0, speed: 0, crystal: 0 };
+    this.crystalHp = crystalMaxHp(0);
+    this.selectedHero = undefined;
+    this.selectedPanel = undefined;
+    this.activeWave = undefined;
+    this.currentWave = 0;
+    this.gameEnded = false;
+    this.heroUid = 1;
+    this.monsterUid = 1;
+    this.baseLabels = {};
+    this.globalSpeedBuffUntil = 0;
+    this.shopPage = 0;
+    this.rangeText = undefined;
+    this.pendingIntroMessage = undefined;
   }
 
   preload(): void {
     for (const hero of HEROES) {
       this.load.svg(`hero-${hero.id}`, `${ASSET_BASE}/heroes/${hero.id}.svg`, { width: 96, height: 112 });
     }
-    for (const monster of ['scout', 'runner', 'brute', 'shield']) {
+    for (const monster of MONSTER_KINDS) {
       this.load.svg(`monster-${monster}`, `${ASSET_BASE}/monsters/${monster}.svg`, { width: 100, height: 112 });
     }
     this.load.svg('crystal', `${ASSET_BASE}/ui/crystal.svg`, { width: 140, height: 170 });
@@ -166,7 +227,7 @@ export class BattleScene extends Phaser.Scene {
     this.createShop();
     this.createDragHandlers();
     this.refreshAll();
-    this.showMessage('先布阵，再点“开战”。商店英雄可拖到战斗区或备战区。');
+    this.showMessage(this.pendingIntroMessage ?? '先布阵，再点“开战”。商店英雄可拖到战斗区或备战区。');
   }
 
   update(time: number, delta: number): void {
@@ -320,19 +381,35 @@ export class BattleScene extends Phaser.Scene {
     this.hudCapacity = this.add.text(42, 158, '', this.textStyle(19, '#cde9d2', 700)).setDepth(102);
 
     this.add.text(326, 35, '战斗控制', this.textStyle(17, '#fff4bd', 800)).setDepth(102);
-    const battleButton = this.createButton(402, 74, 178, 50, '开战', 0xe96b45, () => this.startNextWave());
+    const battleButton = this.createButton(402, 68, 178, 48, '开战', 0xe96b45, () => this.startNextWave(), 21, 14);
     this.uiLayer.add(battleButton);
-    const battleHotspot = this.add.rectangle(402, 74, 236, 76, 0xffffff, 0.001).setDepth(126).setInteractive();
+    const battleHotspot = this.add.rectangle(402, 68, 236, 72, 0xffffff, 0.001).setDepth(126).setInteractive();
     battleHotspot.on('pointerdown', () => {
       this.tweens.add({ targets: battleButton, scale: 0.96, duration: 55, yoyo: true });
       this.startNextWave();
     });
     this.uiLayer.add(battleHotspot);
 
-    const expandButton = this.createButton(402, 135, 178, 48, '', 0x4fb591, () => this.buyGridExpansion(), 18);
+    const expandButton = this.createButton(402, 126, 178, 40, '', 0x4fb591, () => this.buyGridExpansion(), 17, 6);
     this.expandLabel = expandButton.getByName('label') as Phaser.GameObjects.Text;
     this.uiLayer.add(expandButton);
-    this.add.text(314, 172, '扩容会解锁更多相邻格', this.textStyle(15, '#99c7ad', 700)).setDepth(102);
+    this.add.text(314, 161, '难度', this.textStyle(14, '#99c7ad', 800)).setDepth(102);
+    DIFFICULTIES.forEach((difficulty, index) => {
+      const active = difficulty.id === this.difficulty;
+      const button = this.createButton(
+        370 + index * 50,
+        183,
+        42,
+        30,
+        difficulty.shortName,
+        active ? difficulty.color : 0x263b34,
+        () => this.changeDifficulty(difficulty.id),
+        14,
+        5,
+      );
+      button.setAlpha(active ? 1 : 0.78);
+      this.uiLayer.add(button);
+    });
 
     this.add.text(558, 35, '基地升级', this.textStyle(17, '#fff4bd', 800)).setDepth(102);
     const positions: Array<[BaseUpgradeTrack['id'], number, number]> = [
@@ -1047,30 +1124,29 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private spawnMonster(wave: WaveConfig, direction: Direction, kind: MonsterKind): void {
-    const typeMultiplier = {
-      scout: { hp: 1, speed: 1, reward: 1, damage: 1, scale: 0.72 },
-      runner: { hp: 0.72, speed: 1.45, reward: 0.9, damage: 0.82, scale: 0.66 },
-      brute: { hp: 1.72, speed: 0.72, reward: 1.32, damage: 1.35, scale: 0.86 },
-      shield: { hp: 2.05, speed: 0.82, reward: 1.55, damage: 1.48, scale: 0.9 },
-    } satisfies Record<MonsterKind, { hp: number; speed: number; reward: number; damage: number; scale: number }>;
-
-    const mod = typeMultiplier[kind];
+    const mod = MONSTER_TYPE_STATS[kind];
+    const difficulty = getDifficultyConfig(this.difficulty);
+    const isGold = wave.isGoldWave || kind.startsWith('gold');
+    const tier = Math.min(4, Math.floor((wave.wave - 1) / 4));
     const offset = Phaser.Math.Between(-70, 70);
     const path = this.createPath(direction, offset);
     const start = path[0];
     const container = this.add.container(start.x, start.y).setDepth(40);
+    const aura = this.add.ellipse(0, -18, 84 + tier * 8, 72 + tier * 7, isGold ? 0xffd36e : 0x92ffb8, isGold ? 0.2 : 0.05 + tier * 0.025);
     const sprite = this.add.image(0, -18, `monster-${kind}`).setScale(mod.scale);
     const hpBack = this.add.rectangle(-34, 45, 68, 7, 0x111111, 0.82).setOrigin(0, 0.5);
-    const hpFill = this.add.rectangle(-34, 45, 68, 7, 0xff6b5c, 1).setOrigin(0, 0.5);
-    container.add([sprite, hpBack, hpFill]);
+    const hpFill = this.add.rectangle(-34, 45, 68, 7, isGold ? 0xffd36e : 0xff6b5c, 1).setOrigin(0, 0.5);
+    const badge = this.add.text(0, -78, isGold ? '金币' : `Lv.${wave.wave}`, this.textStyle(13, isGold ? '#fff1a6' : '#e7fff1', 900)).setOrigin(0.5).setAlpha(isGold ? 1 : 0.72);
+    container.add([aura, sprite, hpBack, hpFill, badge]);
     const monster: MonsterUnit = {
       uid: this.monsterUid,
       kind,
-      hp: wave.hp * mod.hp,
-      maxHp: wave.hp * mod.hp,
-      speed: wave.speed * mod.speed,
-      damage: wave.damage * mod.damage,
-      reward: Math.round(wave.reward * mod.reward),
+      isGold,
+      hp: Math.round(wave.hp * mod.hp * difficulty.hpMultiplier),
+      maxHp: Math.round(wave.hp * mod.hp * difficulty.hpMultiplier),
+      speed: wave.speed * mod.speed * difficulty.speedMultiplier,
+      damage: isGold ? 0 : wave.damage * mod.damage,
+      reward: Math.max(1, Math.round(wave.reward * mod.reward * difficulty.rewardMultiplier)),
       path,
       pathIndex: 1,
       progress: 0,
@@ -1139,6 +1215,19 @@ export class BattleScene extends Phaser.Scene {
         continue;
       }
 
+      const reachedCrystal = monster.pathIndex >= monster.path.length
+        || Phaser.Math.Distance.Between(monster.container.x, monster.container.y, CRYSTAL_POS.x, CRYSTAL_POS.y + 34) < 52;
+
+      if (monster.isGold) {
+        if (reachedCrystal) {
+          this.escapeMonster(monster);
+          continue;
+        }
+        const speed = monster.speed * monster.status.slowFactor;
+        this.moveMonsterAlongPath(monster, speed * dt);
+        continue;
+      }
+
       const targetStillValid = monster.targetHero
         && monster.targetHero.hp > 0
         && monster.targetHero.location.type === 'board'
@@ -1153,7 +1242,7 @@ export class BattleScene extends Phaser.Scene {
         continue;
       }
 
-      if (Phaser.Math.Distance.Between(monster.container.x, monster.container.y, CRYSTAL_POS.x, CRYSTAL_POS.y + 34) < 52) {
+      if (reachedCrystal) {
         monster.attackingCrystal = true;
         this.attackCrystal(monster);
         continue;
@@ -1228,6 +1317,10 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private attackCrystal(monster: MonsterUnit): void {
+    if (monster.isGold) {
+      this.escapeMonster(monster);
+      return;
+    }
     if (monster.attackCooldown > 0) {
       return;
     }
@@ -1294,6 +1387,24 @@ export class BattleScene extends Phaser.Scene {
     this.refreshHud();
   }
 
+  private escapeMonster(monster: MonsterUnit): void {
+    if (monster.dead) {
+      return;
+    }
+    monster.dead = true;
+    this.flashAt(monster.container.x, monster.container.y - 44, 0xffd36e, '逃走');
+    this.monsters = this.monsters.filter((candidate) => candidate.uid !== monster.uid);
+    this.tweens.add({
+      targets: monster.container,
+      alpha: 0,
+      scale: 0.72,
+      x: CRYSTAL_POS.x + 42,
+      duration: 220,
+      ease: 'Sine.easeIn',
+      onComplete: () => monster.container.destroy(),
+    });
+  }
+
   private applyBurn(monster: MonsterUnit, dps: number, until: number): void {
     monster.status.burnDps = Math.max(monster.status.burnDps, dps);
     monster.status.burnUntil = Math.max(monster.status.burnUntil, until);
@@ -1355,6 +1466,14 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
+  private changeDifficulty(difficulty: DifficultyId): void {
+    if (difficulty === this.difficulty) {
+      this.showMessage(`当前已是${getDifficultyConfig(difficulty).name}难度`);
+      return;
+    }
+    this.scene.restart({ difficulty, restartedByDifficulty: true } satisfies SceneInitData);
+  }
+
   private startNextWave(): void {
     if (this.activeWave || this.gameEnded) {
       if (this.activeWave) {
@@ -1373,7 +1492,9 @@ export class BattleScene extends Phaser.Scene {
       spawned: 0,
       nextSpawnAt: this.time.now + 400,
     };
-    this.showMessage(`开战！第 ${this.currentWave} 波怪物已从左侧路线进攻`);
+    const difficulty = getDifficultyConfig(this.difficulty);
+    const waveType = config.isGoldWave ? '金币关！金币怪不攻击水晶，击杀掉更多金币' : '怪物已从左侧路线进攻';
+    this.showMessage(`${difficulty.name}难度 · ${config.stageName}：${waveType}`);
     this.refreshHud();
   }
 
@@ -1382,9 +1503,11 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
     if (this.activeWave.spawned >= this.activeWave.config.count && this.monsters.length === 0) {
-      const clearReward = 70 + this.currentWave * 18;
+      const difficulty = getDifficultyConfig(this.difficulty);
+      const goldWaveBonus = this.activeWave.config.isGoldWave ? 1.45 : 1;
+      const clearReward = Math.round((70 + this.currentWave * 18) * difficulty.clearRewardMultiplier * goldWaveBonus);
       this.gold += clearReward;
-      this.showMessage(`第 ${this.currentWave} 波完成，清波奖励 +${clearReward}`);
+      this.showMessage(`${this.activeWave.config.stageName}完成，清波奖励 +${clearReward}`);
       this.activeWave = undefined;
       if (this.currentWave >= WAVES.length) {
         this.endGame(true);
@@ -1509,8 +1632,9 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private refreshHud(): void {
+    const difficulty = getDifficultyConfig(this.difficulty);
     this.hudGold.setText(`金币 ${this.gold}`);
-    this.hudWave.setText(`波次 ${this.currentWave}/${WAVES.length}`);
+    this.hudWave.setText(`波次 ${this.currentWave}/${WAVES.length} · ${difficulty.name}`);
     this.hudCrystal.setText(`晶核 ${Math.ceil(this.crystalHp)}/${crystalMaxHp(this.baseLevels.crystal)}`);
     this.hudCapacity.setText(`战斗容量 ${this.usedCapacity()}/${this.gridCapacity}`);
 
@@ -1565,12 +1689,11 @@ export class BattleScene extends Phaser.Scene {
     return container;
   }
 
-  private createButton(x: number, y: number, width: number, height: number, label: string, color: number, onClick: () => void, fontSize = 21): Phaser.GameObjects.Container {
+  private createButton(x: number, y: number, width: number, height: number, label: string, color: number, onClick: () => void, fontSize = 21, hitPadding = 10): Phaser.GameObjects.Container {
     const button = this.add.container(x, y).setSize(width, height).setDepth(120);
     const bg = this.add.rectangle(0, 0, width, height, color, 0.88).setStrokeStyle(2, 0xffffff, 0.15);
     const text = this.add.text(0, 0, label, this.textStyle(fontSize, '#fff7df', 900)).setOrigin(0.5).setName('label');
     button.add([bg, text]);
-    const hitPadding = 10;
     button.setInteractive(new Phaser.Geom.Rectangle(-width / 2 - hitPadding, -height / 2 - hitPadding, width + hitPadding * 2, height + hitPadding * 2), Phaser.Geom.Rectangle.Contains);
     button.on('pointerover', () => bg.setFillStyle(color, 1));
     button.on('pointerout', () => bg.setFillStyle(color, 0.88));
@@ -1792,7 +1915,7 @@ export class BattleScene extends Phaser.Scene {
     const overlay = this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT, 0x050706, 0.72).setDepth(500);
     const title = this.add.text(WIDTH / 2, HEIGHT / 2 - 58, victory ? '通关成功' : '晶核破碎', this.textStyle(48, victory ? '#fff1a6' : '#ff9b8c', 900)).setOrigin(0.5).setDepth(501);
     const subtitle = this.add.text(WIDTH / 2, HEIGHT / 2 + 4, victory ? '20 波进攻已全部击退' : '调整阵容后重新挑战', this.textStyle(24, '#e7fff1', 800)).setOrigin(0.5).setDepth(501);
-    const restart = this.createButton(WIDTH / 2, HEIGHT / 2 + 86, 210, 58, '重新开始', 0x4fb591, () => this.scene.restart());
+    const restart = this.createButton(WIDTH / 2, HEIGHT / 2 + 86, 210, 58, '重新开始', 0x4fb591, () => this.scene.restart({ difficulty: this.difficulty } satisfies SceneInitData));
     restart.setDepth(502);
     this.uiLayer.add([overlay, title, subtitle, restart]);
   }
