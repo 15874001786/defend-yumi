@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 112">
+  <defs>
+    <radialGradient id="a" cx="34%" cy="22%" r="80%">
+      <stop offset="0%" stop-color="#ffc15f"/>
+      <stop offset="62%" stop-color="#f06a3a"/>
+      <stop offset="100%" stop-color="#351513"/>
+    </radialGradient>
+    <filter id="s" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000" flood-opacity=".45"/>
+    </filter>
+  </defs>
+  <ellipse cx="48" cy="100" rx="32" ry="8" fill="#050706" opacity=".42"/>
+  <g filter="url(#s)">
+    <path d="M42 24 C56 34 67 48 64 67 C61 86 47 96 32 93 C46 76 28 66 40 48 C45 40 38 34 42 24 Z" fill="url(#a)" stroke="#ffc15f" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="45" cy="50" r="15" fill="#351513" opacity=".72"/>
+    <circle cx="39" cy="48" r="3" fill="#ffc15f"/>
+    <circle cx="51" cy="48" r="3" fill="#ffc15f"/>
+    <path d="M33 69 C39 76 53 76 59 69" fill="none" stroke="#ffc15f" stroke-width="3" stroke-linecap="round" opacity=".88"/>
+    <text x="48" y="107" text-anchor="middle" font-size="15" font-family="Microsoft YaHei, sans-serif" font-weight="800" fill="#ffc15f">火</text>
+  </g>
+</svg>

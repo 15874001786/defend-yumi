@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 112">
+  <defs>
+    <radialGradient id="a" cx="34%" cy="22%" r="80%">
+      <stop offset="0%" stop-color="#e8fbff"/>
+      <stop offset="62%" stop-color="#7bd6ff"/>
+      <stop offset="100%" stop-color="#12314a"/>
+    </radialGradient>
+    <filter id="s" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000" flood-opacity=".45"/>
+    </filter>
+  </defs>
+  <ellipse cx="48" cy="100" rx="32" ry="8" fill="#050706" opacity=".42"/>
+  <g filter="url(#s)">
+    <path d="M32 20 L58 31 L62 61 L42 94 L21 61 L24 31 Z" fill="url(#a)" stroke="#e8fbff" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="45" cy="50" r="15" fill="#12314a" opacity=".72"/>
+    <circle cx="39" cy="48" r="3" fill="#e8fbff"/>
+    <circle cx="51" cy="48" r="3" fill="#e8fbff"/>
+    <path d="M33 69 C39 76 53 76 59 69" fill="none" stroke="#e8fbff" stroke-width="3" stroke-linecap="round" opacity=".88"/>
+    <text x="48" y="107" text-anchor="middle" font-size="15" font-family="Microsoft YaHei, sans-serif" font-weight="800" fill="#e8fbff">霜</text>
+  </g>
+</svg>
