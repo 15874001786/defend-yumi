@@ -333,7 +333,7 @@ export class BattleScene extends Phaser.Scene {
       bg.fillCircle(Phaser.Math.Between(22, WIDTH - 22), Phaser.Math.Between(210, 1180), Phaser.Math.Between(3, 10));
     }
 
-    const topPanel = this.add.rectangle(WIDTH / 2, 136, WIDTH - 34, 248, 0x0d1210, 0.86).setDepth(90);
+    const topPanel = this.add.rectangle(WIDTH / 2, 154, WIDTH - 34, 300, 0x0d1210, 0.88).setDepth(90);
     topPanel.setStrokeStyle(2, 0xd6aa55, 0.28);
     const bottomPanel = this.add.rectangle(WIDTH / 2, 1300, WIDTH - 34, 600, 0x101512, 0.9);
     bottomPanel.setStrokeStyle(2, 0x70c7b4, 0.2);
@@ -446,9 +446,9 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createHud(): void {
-    const statCard = this.add.rectangle(154, 116, 248, 190, 0x142319, 0.92).setStrokeStyle(2, 0x8bcf8b, 0.28).setDepth(101);
-    const actionCard = this.add.rectangle(414, 116, 286, 190, 0x142018, 0.88).setStrokeStyle(2, 0xf2ca73, 0.22).setDepth(101);
-    const upgradeCard = this.add.rectangle(736, 116, 252, 190, 0x122019, 0.9).setStrokeStyle(2, 0x7dd8bc, 0.22).setDepth(101);
+    const statCard = this.add.rectangle(154, 142, 248, 244, 0x142319, 0.92).setStrokeStyle(2, 0x8bcf8b, 0.28).setDepth(101);
+    const actionCard = this.add.rectangle(414, 150, 300, 268, 0x142018, 0.9).setStrokeStyle(2, 0xf2ca73, 0.24).setDepth(101);
+    const upgradeCard = this.add.rectangle(736, 150, 252, 268, 0x122019, 0.92).setStrokeStyle(2, 0x7dd8bc, 0.24).setDepth(101);
     this.uiLayer.add([statCard, actionCard, upgradeCard]);
 
     this.add.text(42, 28, '资源', this.textStyle(16, '#9fc9b2', 800)).setDepth(102);
@@ -458,34 +458,36 @@ export class BattleScene extends Phaser.Scene {
     this.hudCapacity = this.add.text(42, 158, '', this.textStyle(19, '#cde9d2', 700)).setDepth(102);
 
     this.add.text(304, 29, '战斗控制', this.textStyle(17, '#fff4bd', 800)).setDepth(102);
-    const battleButton = this.createButton(350, 64, 108, 42, '开战', 0xe96b45, () => this.startNextWave(), 20, 4);
+    const battleButton = this.createButton(346, 70, 124, 56, '开战', 0xe96b45, () => this.startNextWave(), 20, 4, 134, 64);
     this.uiLayer.add(battleButton);
 
-    const pauseButton = this.createButton(482, 64, 108, 42, '暂停', 0x49677b, () => this.togglePause(), 18, 4);
+    const pauseButton = this.createButton(490, 70, 124, 56, '暂停', 0x49677b, () => this.togglePause(), 18, 4, 134, 64);
     this.pauseLabel = pauseButton.getByName('label') as Phaser.GameObjects.Text;
     this.uiLayer.add(pauseButton);
 
-    const expandButton = this.createButton(416, 111, 240, 40, '', 0x4fb591, () => this.buyGridExpansion(), 17, 4);
+    const expandButton = this.createButton(418, 136, 272, 58, '', 0x4fb591, () => this.buyGridExpansion(), 17, 4, 286, 66);
     this.expandLabel = expandButton.getByName('label') as Phaser.GameObjects.Text;
     this.uiLayer.add(expandButton);
 
-    const saveButton = this.createButton(350, 156, 108, 36, '保存', 0x2d7363, () => this.saveGame(), 16, 4);
-    const loadButton = this.createButton(482, 156, 108, 36, '读取', 0x354c60, () => this.loadSavedGame(), 16, 4);
+    const saveButton = this.createButton(346, 200, 124, 44, '保存', 0x2d7363, () => this.saveGame(), 16, 4, 134, 52);
+    const loadButton = this.createButton(490, 200, 124, 44, '读取', 0x354c60, () => this.loadSavedGame(), 16, 4, 134, 52);
     this.uiLayer.add([saveButton, loadButton]);
 
-    this.add.text(314, 188, '难度', this.textStyle(14, '#99c7ad', 800)).setDepth(102);
+    this.add.text(314, 244, '难度', this.textStyle(14, '#99c7ad', 800)).setDepth(102);
     DIFFICULTIES.forEach((difficulty, index) => {
       const active = difficulty.id === this.difficulty;
       const button = this.createButton(
-        374 + index * 51,
-        199,
-        44,
-        28,
+        366 + index * 60,
+        264,
+        54,
+        36,
         difficulty.shortName,
         active ? difficulty.color : 0x263b34,
         () => this.changeDifficulty(difficulty.id),
         14,
         5,
+        62,
+        44,
       );
       button.setAlpha(active ? 1 : 0.78);
       this.uiLayer.add(button);
@@ -493,9 +495,9 @@ export class BattleScene extends Phaser.Scene {
 
     this.add.text(622, 29, '基地升级', this.textStyle(17, '#fff4bd', 800)).setDepth(102);
     const positions: Array<[BaseUpgradeTrack['id'], number, number]> = [
-      ['attack', 736, 70],
-      ['speed', 736, 124],
-      ['crystal', 736, 178],
+      ['attack', 736, 72],
+      ['speed', 736, 144],
+      ['crystal', 736, 216],
     ];
 
     for (const [id, x, y] of positions) {
@@ -503,7 +505,7 @@ export class BattleScene extends Phaser.Scene {
       if (!upgrade) {
         continue;
       }
-      const button = this.createButton(x, y, 218, 40, '', 0x2d7363, () => this.buyBaseUpgrade(id), 14, 4);
+      const button = this.createButton(x, y, 222, 56, '', 0x2d7363, () => this.buyBaseUpgrade(id), 14, 4, 232, 66);
       this.baseLabels[id] = button.getByName('label') as Phaser.GameObjects.Text;
       this.uiLayer.add(button);
     }
@@ -514,7 +516,7 @@ export class BattleScene extends Phaser.Scene {
       backgroundColor: 'rgba(17, 23, 20, 0.78)',
       padding: { x: 18, y: 10 },
     }).setOrigin(0.5).setDepth(150);
-    this.messageText.setY(262);
+    this.messageText.setY(302);
   }
 
   private createBench(): void {
@@ -2057,12 +2059,25 @@ export class BattleScene extends Phaser.Scene {
     return container;
   }
 
-  private createButton(x: number, y: number, width: number, height: number, label: string, color: number, onClick: () => void, fontSize = 21, hitPadding = 10): Phaser.GameObjects.Container {
+  private createButton(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    label: string,
+    color: number,
+    onClick: () => void,
+    fontSize = 21,
+    hitPadding = 10,
+    touchWidth = width + hitPadding * 2,
+    touchHeight = height + hitPadding * 2,
+  ): Phaser.GameObjects.Container {
     const button = this.add.container(x, y).setSize(width, height).setDepth(120);
     const bg = this.add.rectangle(0, 0, width, height, color, 0.88).setStrokeStyle(2, 0xffffff, 0.15);
     const text = this.add.text(0, 0, label, this.textStyle(fontSize, '#fff7df', 900)).setOrigin(0.5).setName('label');
     button.add([bg, text]);
-    button.setInteractive(new Phaser.Geom.Rectangle(-width / 2 - hitPadding, -height / 2 - hitPadding, width + hitPadding * 2, height + hitPadding * 2), Phaser.Geom.Rectangle.Contains);
+    // Keep touch targets independent from the painted size so mobile taps stay reliable.
+    button.setInteractive(new Phaser.Geom.Rectangle(-touchWidth / 2, -touchHeight / 2, touchWidth, touchHeight), Phaser.Geom.Rectangle.Contains);
     button.on('pointerover', () => bg.setFillStyle(color, 1));
     button.on('pointerout', () => bg.setFillStyle(color, 0.88));
     button.on('pointerdown', () => {
