@@ -80,10 +80,10 @@ export const HEROES: HeroDefinition[] = [
     maxHp: 420,
     color: 0xd34c5f,
     accent: 0xf5d8bf,
-    summary: '近距离高速斩击，扇形伤害并能拦截冲入内圈的怪物。',
+    summary: '近距离高速斩击，扇形伤害覆盖路线内侧的密集怪物。',
     skills: [
       { level: 3, name: '回身斩', cost: 0, description: '攻击时额外命中身后最近的怪物。' },
-      { level: 6, name: '残影步', cost: 440, description: '攻速提升，受到怪物攻击时获得短暂闪避。' },
+      { level: 6, name: '残影步', cost: 440, description: '攻速提升，斩击残影会追加一次技能辉光。' },
       { level: 9, name: '百裂终幕', cost: 1320, description: '连续斩击内圈所有怪物。' },
     ],
   },
@@ -101,11 +101,11 @@ export const HEROES: HeroDefinition[] = [
     maxHp: 260,
     color: 0xffb84d,
     accent: 0xfff1a6,
-    summary: '光束伤害较低，但会治疗受伤英雄并提供团队增益。',
+    summary: '光束伤害较低，但会修复晶核并提供团队增益。',
     skills: [
-      { level: 3, name: '暖阳祷词', cost: 0, description: '每次攻击治疗最低生命英雄。' },
+      { level: 3, name: '暖阳祷词', cost: 0, description: '每次攻击都会为晶核恢复少量生命。' },
       { level: 6, name: '日冕祝福', cost: 650, description: '附近英雄攻击力提升。' },
-      { level: 9, name: '重燃圣歌', cost: 1680, description: '每波可复苏一次倒下英雄。' },
+      { level: 9, name: '重燃圣歌', cost: 1680, description: '周期性爆发圣歌，额外修复晶核并灼伤路径怪物。' },
     ],
   },
   {

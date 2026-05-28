@@ -7,15 +7,15 @@ import type { BaseLevels, BaseUpgradeTrack, DifficultyId, HeroDefinition, HeroSt
 
 const WIDTH = 900;
 const HEIGHT = 1600;
-const BOARD_CENTER = { x: 450, y: 620 };
+const BOARD_CENTER = { x: 450, y: 664 };
 const CRYSTAL_POS = { x: 802, y: 334 };
-const BOARD_TOP = 312;
+const BOARD_TOP = 356;
 const BOARD_GRID = {
   cols: 6,
   rows: 5,
   cell: 104,
-  x: 156,
-  y: 360,
+  x: 190,
+  y: 404,
 };
 const SELECTED_PANEL_Y = 980;
 const BENCH_Y = 1116;
@@ -205,6 +205,8 @@ export class BattleScene extends Phaser.Scene {
   private rangeGraphics!: Phaser.GameObjects.Graphics;
   private uiLayer!: Phaser.GameObjects.Layer;
   private effectLayer!: Phaser.GameObjects.Layer;
+  private topUi!: Phaser.GameObjects.Container;
+  private bottomUi!: Phaser.GameObjects.Container;
   private slots: Slot[] = [];
   private benchSlots: BenchSlot[] = [];
   private heroes: HeroUnit[] = [];
@@ -238,6 +240,10 @@ export class BattleScene extends Phaser.Scene {
   private isPaused = false;
   private pausedAt = 0;
   private pauseLabel!: Phaser.GameObjects.Text;
+  private topUiExpanded = false;
+  private bottomUiExpanded = false;
+  private topToggleLabel!: Phaser.GameObjects.Text;
+  private bottomToggleLabel!: Phaser.GameObjects.Text;
 
   constructor() {
     super('BattleScene');
@@ -293,18 +299,23 @@ export class BattleScene extends Phaser.Scene {
     this.input.topOnly = true;
     this.effectLayer = this.add.layer().setDepth(70);
     this.uiLayer = this.add.layer().setDepth(100);
+    this.topUi = this.add.container(0, 0).setDepth(100);
+    this.bottomUi = this.add.container(0, 0).setDepth(100);
     this.createBackground();
     this.createBoard();
     this.createCrystal();
     this.createHud();
     this.createBench();
     this.createShop();
+    this.createHudToggles();
+    this.setTopUiExpanded(false, false);
+    this.setBottomUiExpanded(false, false);
     this.createDragHandlers();
     if (this.shouldLoadSave) {
       this.restoreSavedGame();
     }
     this.refreshAll();
-    this.showMessage(this.pendingIntroMessage ?? '先布阵，再点“开战”。商店英雄可拖到战斗区或备战区。');
+    this.showMessage(this.pendingIntroMessage ?? '展开底部商店布阵，展开顶部控制开战；收起面板可查看完整路线。');
   }
 
   update(time: number, delta: number): void {
@@ -332,11 +343,6 @@ export class BattleScene extends Phaser.Scene {
     for (let i = 0; i < 46; i += 1) {
       bg.fillCircle(Phaser.Math.Between(22, WIDTH - 22), Phaser.Math.Between(210, 1180), Phaser.Math.Between(3, 10));
     }
-
-    const topPanel = this.add.rectangle(WIDTH / 2, 154, WIDTH - 34, 300, 0x0d1210, 0.88).setDepth(90);
-    topPanel.setStrokeStyle(2, 0xd6aa55, 0.28);
-    const bottomPanel = this.add.rectangle(WIDTH / 2, 1300, WIDTH - 34, 600, 0x101512, 0.9);
-    bottomPanel.setStrokeStyle(2, 0x70c7b4, 0.2);
 
     this.pathGraphics = this.add.graphics().setDepth(4);
     this.drawPaths();
@@ -446,34 +452,32 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createHud(): void {
-    const statCard = this.add.rectangle(154, 142, 248, 244, 0x142319, 0.92).setStrokeStyle(2, 0x8bcf8b, 0.28).setDepth(101);
-    const actionCard = this.add.rectangle(414, 150, 300, 268, 0x142018, 0.9).setStrokeStyle(2, 0xf2ca73, 0.24).setDepth(101);
-    const upgradeCard = this.add.rectangle(736, 150, 252, 268, 0x122019, 0.92).setStrokeStyle(2, 0x7dd8bc, 0.24).setDepth(101);
-    this.uiLayer.add([statCard, actionCard, upgradeCard]);
-
-    this.add.text(42, 28, '资源', this.textStyle(16, '#9fc9b2', 800)).setDepth(102);
+    const topPanel = this.add.rectangle(WIDTH / 2, 154, WIDTH - 34, 300, 0x0d1210, 0.9).setStrokeStyle(2, 0xd6aa55, 0.28);
+    const statCard = this.add.rectangle(154, 142, 248, 244, 0x142319, 0.92).setStrokeStyle(2, 0x8bcf8b, 0.28);
+    const actionCard = this.add.rectangle(414, 150, 300, 268, 0x142018, 0.9).setStrokeStyle(2, 0xf2ca73, 0.24);
+    const upgradeCard = this.add.rectangle(736, 150, 252, 268, 0x122019, 0.92).setStrokeStyle(2, 0x7dd8bc, 0.24);
+    const resourceTitle = this.add.text(42, 28, '资源', this.textStyle(16, '#9fc9b2', 800));
     this.hudGold = this.add.text(42, 52, '', this.textStyle(28, '#ffe09a', 800)).setDepth(102);
     this.hudWave = this.add.text(42, 92, '', this.textStyle(22, '#e8fff8', 800)).setDepth(102);
     this.hudCrystal = this.add.text(42, 126, '', this.textStyle(20, '#9dfff0', 800)).setDepth(102);
     this.hudCapacity = this.add.text(42, 158, '', this.textStyle(19, '#cde9d2', 700)).setDepth(102);
+    this.topUi.add([topPanel, statCard, actionCard, upgradeCard, resourceTitle, this.hudGold, this.hudWave, this.hudCrystal, this.hudCapacity]);
 
-    this.add.text(304, 29, '战斗控制', this.textStyle(17, '#fff4bd', 800)).setDepth(102);
+    const controlTitle = this.add.text(304, 29, '战斗控制', this.textStyle(17, '#fff4bd', 800));
     const battleButton = this.createButton(346, 70, 124, 56, '开战', 0xe96b45, () => this.startNextWave(), 20, 4, 134, 64);
-    this.uiLayer.add(battleButton);
 
     const pauseButton = this.createButton(490, 70, 124, 56, '暂停', 0x49677b, () => this.togglePause(), 18, 4, 134, 64);
     this.pauseLabel = pauseButton.getByName('label') as Phaser.GameObjects.Text;
-    this.uiLayer.add(pauseButton);
 
     const expandButton = this.createButton(418, 136, 272, 58, '', 0x4fb591, () => this.buyGridExpansion(), 17, 4, 286, 66);
     this.expandLabel = expandButton.getByName('label') as Phaser.GameObjects.Text;
-    this.uiLayer.add(expandButton);
 
     const saveButton = this.createButton(346, 200, 124, 44, '保存', 0x2d7363, () => this.saveGame(), 16, 4, 134, 52);
     const loadButton = this.createButton(490, 200, 124, 44, '读取', 0x354c60, () => this.loadSavedGame(), 16, 4, 134, 52);
-    this.uiLayer.add([saveButton, loadButton]);
+    this.topUi.add([controlTitle, battleButton, pauseButton, expandButton, saveButton, loadButton]);
 
-    this.add.text(314, 244, '难度', this.textStyle(14, '#99c7ad', 800)).setDepth(102);
+    const difficultyTitle = this.add.text(314, 244, '难度', this.textStyle(14, '#99c7ad', 800));
+    this.topUi.add(difficultyTitle);
     DIFFICULTIES.forEach((difficulty, index) => {
       const active = difficulty.id === this.difficulty;
       const button = this.createButton(
@@ -490,10 +494,11 @@ export class BattleScene extends Phaser.Scene {
         44,
       );
       button.setAlpha(active ? 1 : 0.78);
-      this.uiLayer.add(button);
+      this.topUi.add(button);
     });
 
-    this.add.text(622, 29, '基地升级', this.textStyle(17, '#fff4bd', 800)).setDepth(102);
+    const upgradeTitle = this.add.text(622, 29, '基地升级', this.textStyle(17, '#fff4bd', 800));
+    this.topUi.add(upgradeTitle);
     const positions: Array<[BaseUpgradeTrack['id'], number, number]> = [
       ['attack', 736, 72],
       ['speed', 736, 144],
@@ -507,7 +512,7 @@ export class BattleScene extends Phaser.Scene {
       }
       const button = this.createButton(x, y, 222, 56, '', 0x2d7363, () => this.buyBaseUpgrade(id), 14, 4, 232, 66);
       this.baseLabels[id] = button.getByName('label') as Phaser.GameObjects.Text;
-      this.uiLayer.add(button);
+      this.topUi.add(button);
     }
 
     this.messageText = this.add.text(WIDTH / 2, 222, '', {
@@ -516,12 +521,14 @@ export class BattleScene extends Phaser.Scene {
       backgroundColor: 'rgba(17, 23, 20, 0.78)',
       padding: { x: 18, y: 10 },
     }).setOrigin(0.5).setDepth(150);
-    this.messageText.setY(302);
+    this.messageText.setY(116);
   }
 
   private createBench(): void {
-    this.add.text(34, 1056, '备战区', this.textStyle(26, '#e7fff1', 800)).setDepth(101);
-    this.add.text(140, 1061, '可先合成，再拖入战斗区', this.textStyle(18, '#9fc9b2', 600)).setDepth(101);
+    const bottomPanel = this.add.rectangle(WIDTH / 2, 1300, WIDTH - 34, 600, 0x101512, 0.92).setStrokeStyle(2, 0x70c7b4, 0.2);
+    const benchTitle = this.add.text(34, 1056, '备战区', this.textStyle(26, '#e7fff1', 800));
+    const benchHint = this.add.text(140, 1061, '可先合成，再拖入战斗区', this.textStyle(18, '#9fc9b2', 600));
+    this.bottomUi.add([bottomPanel, benchTitle, benchHint]);
 
     const startX = 66;
     const gap = 98;
@@ -529,21 +536,50 @@ export class BattleScene extends Phaser.Scene {
       const x = startX + i * gap;
       const y = BENCH_Y;
       this.benchSlots.push({ index: i, x, y });
-      const slot = this.add.rectangle(x, y, 82, 88, 0x18211d, 0.9).setDepth(100);
+      const slot = this.add.rectangle(x, y, 82, 88, 0x18211d, 0.9);
       slot.setStrokeStyle(2, 0x9edfbf, 0.24);
-      this.add.text(x, y + 51, `${i + 1}`, this.textStyle(13, '#70947e', 700)).setOrigin(0.5).setDepth(101);
+      const slotIndex = this.add.text(x, y + 51, `${i + 1}`, this.textStyle(13, '#70947e', 700)).setOrigin(0.5);
+      this.bottomUi.add([slot, slotIndex]);
     }
   }
 
   private createShop(): void {
-    this.add.text(34, 1192, '英雄商店', this.textStyle(26, '#ffe09a', 800)).setDepth(101);
-    this.add.text(34, 1224, '大卡片拖拽购买，翻页查看全部英雄', this.textStyle(18, '#ccb782', 600)).setDepth(101);
+    const shopTitle = this.add.text(34, 1192, '英雄商店', this.textStyle(26, '#ffe09a', 800));
+    const shopHint = this.add.text(34, 1224, '大卡片拖拽购买，翻页查看全部英雄', this.textStyle(18, '#ccb782', 600));
 
     const prev = this.createButton(612, 1234, 86, 40, '上页', 0x2d7363, () => this.changeShopPage(-1), 16);
     const next = this.createButton(812, 1234, 86, 40, '下页', 0x2d7363, () => this.changeShopPage(1), 16);
-    this.shopPageText = this.add.text(712, 1234, '', this.textStyle(17, '#e8fff8', 800)).setOrigin(0.5).setDepth(121);
-    this.uiLayer.add([prev, next, this.shopPageText]);
+    this.shopPageText = this.add.text(712, 1234, '', this.textStyle(17, '#e8fff8', 800)).setOrigin(0.5);
+    this.bottomUi.add([shopTitle, shopHint, prev, next, this.shopPageText]);
     this.renderShopCards();
+  }
+
+  private createHudToggles(): void {
+    const topToggle = this.createButton(790, 28, 174, 42, '展开控制', 0x223c32, () => this.setTopUiExpanded(!this.topUiExpanded), 16, 4, 190, 52);
+    topToggle.setDepth(180);
+    this.topToggleLabel = topToggle.getByName('label') as Phaser.GameObjects.Text;
+
+    const bottomToggle = this.createButton(WIDTH / 2, HEIGHT - 34, 214, 46, '展开商店', 0x223c32, () => this.setBottomUiExpanded(!this.bottomUiExpanded), 17, 4, 232, 56);
+    bottomToggle.setDepth(180);
+    this.bottomToggleLabel = bottomToggle.getByName('label') as Phaser.GameObjects.Text;
+  }
+
+  private setTopUiExpanded(expanded: boolean, announce = true): void {
+    this.topUiExpanded = expanded;
+    this.topUi.setVisible(expanded);
+    this.topToggleLabel?.setText(expanded ? '收起控制' : '展开控制');
+    if (announce) {
+      this.showMessage(expanded ? '顶部控制已展开。' : '顶部控制已收起，战场视野已让出。');
+    }
+  }
+
+  private setBottomUiExpanded(expanded: boolean, announce = true): void {
+    this.bottomUiExpanded = expanded;
+    this.bottomUi.setVisible(expanded);
+    this.bottomToggleLabel?.setText(expanded ? '收起商店' : '展开商店');
+    if (announce) {
+      this.showMessage(expanded ? '底部商店与备战区已展开。' : '底部区域已收起，路线不会被遮挡。');
+    }
   }
 
   private createShopCard(hero: HeroDefinition, x: number, y: number, width: number, height: number): Phaser.GameObjects.Container {
@@ -589,7 +625,7 @@ export class BattleScene extends Phaser.Scene {
       const y = SHOP_Y + row * (cardHeight + gapY);
       const card = this.createShopCard(hero, x, y, cardWidth, cardHeight);
       this.shopCards.push(card);
-      this.uiLayer.add(card);
+      this.bottomUi.add(card);
     });
     this.refreshAll();
   }
@@ -964,6 +1000,7 @@ export class BattleScene extends Phaser.Scene {
     const tx = target.container.x;
     const ty = target.container.y - 10;
     const skill3 = hero.level >= 3;
+    this.heroCastEffect(hero, target, skill3);
 
     switch (hero.def.attackPattern) {
       case 'burn': {
@@ -1033,12 +1070,13 @@ export class BattleScene extends Phaser.Scene {
       case 'healBeam': {
         this.beamEffect(x, y, tx, ty, 0xfff1a6);
         this.damageMonster(target, stats.damage, hero);
-        const injured = this.heroes
-          .filter((candidate) => candidate.location.type === 'board' && candidate.hp > 0)
-          .sort((a, b) => (a.hp / this.statsFor(a).maxHp) - (b.hp / this.statsFor(b).maxHp))[0];
-        if (injured && (skill3 || injured.hp < this.statsFor(injured).maxHp)) {
-          this.healHero(injured, stats.damage * (hero.learned6 ? 1.15 : 0.9));
-          this.beamEffect(x, y, injured.container.x, injured.container.y - 26, 0xffef95, 2);
+        if (skill3 || this.crystalHp < crystalMaxHp(this.baseLevels.crystal)) {
+          this.repairCrystal(stats.damage * (hero.learned6 ? 0.95 : 0.62), hero.def.accent);
+          this.beamEffect(x, y, CRYSTAL_POS.x, CRYSTAL_POS.y + 10, 0xffef95, 3);
+        }
+        if (hero.learned9 && hero.attackCounter % 6 === 5) {
+          this.repairCrystal(stats.damage * 2.2, hero.def.accent);
+          this.areaDamage(CRYSTAL_POS.x, CRYSTAL_POS.y + 34, 210, stats.damage * 0.9, hero, 0xfff1a6);
         }
         break;
       }
@@ -1146,6 +1184,83 @@ export class BattleScene extends Phaser.Scene {
         break;
       }
     }
+  }
+
+  private heroCastEffect(hero: HeroUnit, target: MonsterUnit, skill3: boolean): void {
+    const x = hero.container.x;
+    const y = hero.container.y - 18;
+    const tx = target.container.x;
+    const ty = target.container.y - 12;
+    const castRing = this.add.ellipse(x, y, 74, 34, hero.def.color, 0.06).setStrokeStyle(3, hero.def.accent, 0.72).setDepth(82);
+    this.effectLayer.add(castRing);
+    this.tweens.add({
+      targets: castRing,
+      scaleX: 1.45,
+      scaleY: 1.28,
+      alpha: 0,
+      duration: 260,
+      ease: 'Sine.easeOut',
+      onComplete: () => castRing.destroy(),
+    });
+
+    if (skill3 && hero.attackCounter % 3 === 0) {
+      this.skillRuneEffect(x, y - 40, hero.def.accent, '3阶');
+    }
+    if (hero.learned6) {
+      const rune = this.add.rectangle(x, y - 58, 20, 20, hero.def.accent, 0.82).setRotation(Math.PI / 4).setDepth(86);
+      this.effectLayer.add(rune);
+      this.lineEffect(x, y, tx, ty, hero.def.accent, 2);
+      this.tweens.add({
+        targets: rune,
+        y: y - 82,
+        rotation: rune.rotation + Math.PI,
+        alpha: 0,
+        duration: 360,
+        ease: 'Sine.easeOut',
+        onComplete: () => rune.destroy(),
+      });
+      if (hero.attackCounter % 5 === 1) {
+        this.skillRuneEffect(tx, ty, hero.def.accent, '6阶');
+      }
+    }
+    if (hero.learned9 && hero.attackCounter % 4 === 2) {
+      const halo = this.add.ellipse(tx, ty, 42, 20, hero.def.color, 0.16).setStrokeStyle(4, 0xffffff, 0.55).setDepth(87);
+      this.effectLayer.add(halo);
+      this.tweens.add({
+        targets: halo,
+        scaleX: 2.25,
+        scaleY: 1.85,
+        alpha: 0,
+        duration: 440,
+        ease: 'Sine.easeOut',
+        onComplete: () => halo.destroy(),
+      });
+      this.skillRuneEffect(tx, ty - 34, hero.def.color, '9阶');
+    }
+  }
+
+  private skillRuneEffect(x: number, y: number, color: number, label: string): void {
+    const ring = this.add.ellipse(x, y, 34, 22, color, 0.18).setStrokeStyle(3, color, 0.85).setDepth(88);
+    const text = this.add.text(x, y, label, this.textStyle(15, '#fff8d5', 900)).setOrigin(0.5).setDepth(89);
+    text.setStroke(Phaser.Display.Color.IntegerToColor(color).rgba, 4);
+    this.effectLayer.add([ring, text]);
+    this.tweens.add({
+      targets: ring,
+      scaleX: 1.9,
+      scaleY: 1.65,
+      alpha: 0,
+      duration: 520,
+      ease: 'Sine.easeOut',
+      onComplete: () => ring.destroy(),
+    });
+    this.tweens.add({
+      targets: text,
+      y: y - 28,
+      alpha: 0,
+      duration: 620,
+      ease: 'Sine.easeOut',
+      onComplete: () => text.destroy(),
+    });
   }
 
   private updateWaveSpawner(time: number): void {
@@ -1269,20 +1384,6 @@ export class BattleScene extends Phaser.Scene {
         continue;
       }
 
-      const targetStillValid = monster.targetHero
-        && monster.targetHero.hp > 0
-        && monster.targetHero.location.type === 'board'
-        && Phaser.Math.Distance.Between(monster.container.x, monster.container.y, monster.targetHero.container.x, monster.targetHero.container.y) < 78;
-
-      if (!targetStillValid) {
-        monster.targetHero = this.findInterceptHero(monster);
-      }
-
-      if (monster.targetHero) {
-        this.attackHero(monster, monster.targetHero);
-        continue;
-      }
-
       if (reachedCrystal) {
         monster.attackingCrystal = true;
         this.attackCrystal(monster);
@@ -1335,28 +1436,6 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  private findInterceptHero(monster: MonsterUnit): HeroUnit | undefined {
-    return this.heroes
-      .filter((hero) => hero.location.type === 'board' && hero.hp > 0)
-      .sort((a, b) => Phaser.Math.Distance.Between(monster.container.x, monster.container.y, a.container.x, a.container.y) - Phaser.Math.Distance.Between(monster.container.x, monster.container.y, b.container.x, b.container.y))
-      .find((hero) => Phaser.Math.Distance.Between(monster.container.x, monster.container.y, hero.container.x, hero.container.y) < 62 + hero.def.size * 4);
-  }
-
-  private attackHero(monster: MonsterUnit, hero: HeroUnit): void {
-    if (monster.attackCooldown > 0) {
-      return;
-    }
-    const mitigation = 1 - this.baseLevels.crystal * 0.025;
-    hero.hp -= monster.damage * mitigation;
-    monster.attackCooldown = 1;
-    this.lineEffect(monster.container.x, monster.container.y - 20, hero.container.x, hero.container.y - 18, 0xff6b5c, 2);
-    this.refreshHeroVisual(hero);
-    if (hero.hp <= 0) {
-      this.handleHeroDefeated(hero);
-      monster.targetHero = undefined;
-    }
-  }
-
   private attackCrystal(monster: MonsterUnit): void {
     if (monster.isGold) {
       this.escapeMonster(monster);
@@ -1365,7 +1444,8 @@ export class BattleScene extends Phaser.Scene {
     if (monster.attackCooldown > 0) {
       return;
     }
-    this.crystalHp -= monster.damage;
+    const mitigation = 1 - this.baseLevels.crystal * 0.025;
+    this.crystalHp -= monster.damage * mitigation;
     monster.attackCooldown = 1;
     this.cameras.main.shake(120, 0.0035);
     this.circleEffect(CRYSTAL_POS.x, CRYSTAL_POS.y + 34, 72, 0xff6b5c, 200);
@@ -1374,21 +1454,6 @@ export class BattleScene extends Phaser.Scene {
       this.endGame(false);
     }
     this.refreshHud();
-  }
-
-  private handleHeroDefeated(hero: HeroUnit): void {
-    const reviver = this.heroes.find((candidate) => candidate.def.id === 'sun-chanter' && candidate.learned9 && candidate.location.type === 'board' && candidate.reviveUsedWave !== this.currentWave && candidate.hp > 0);
-    if (reviver) {
-      reviver.reviveUsedWave = this.currentWave;
-      const stats = this.statsFor(hero);
-      hero.hp = stats.maxHp * 0.45;
-      this.flashAt(hero.container.x, hero.container.y - 58, 0xfff1a6, '复苏');
-      this.refreshHeroVisual(hero);
-      return;
-    }
-    this.removeHeroFromLocation(hero);
-    this.destroyHero(hero);
-    this.refreshAll();
   }
 
   private damageMonster(monster: MonsterUnit, amount: number, source?: HeroUnit, showFlash = true): void {
@@ -1447,18 +1512,44 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private applyBurn(monster: MonsterUnit, dps: number, until: number): void {
+    const firstApply = monster.status.burnUntil <= this.time.now;
     monster.status.burnDps = Math.max(monster.status.burnDps, dps);
     monster.status.burnUntil = Math.max(monster.status.burnUntil, until);
+    if (firstApply) {
+      this.statusMarker(monster, '燃烧', 0xffa15f);
+    }
   }
 
   private applyPoison(monster: MonsterUnit, dps: number, until: number): void {
+    const firstApply = monster.status.poisonUntil <= this.time.now;
     monster.status.poisonDps = Math.max(monster.status.poisonDps, dps);
     monster.status.poisonUntil = Math.max(monster.status.poisonUntil, until);
+    if (firstApply) {
+      this.statusMarker(monster, '中毒', 0xa8ff73);
+    }
   }
 
   private applySlow(monster: MonsterUnit, factor: number, until: number): void {
+    const firstApply = monster.status.slowUntil <= this.time.now;
     monster.status.slowFactor = Math.min(monster.status.slowFactor, factor);
     monster.status.slowUntil = Math.max(monster.status.slowUntil, until);
+    if (firstApply) {
+      this.statusMarker(monster, '减速', 0x9be9ff);
+    }
+  }
+
+  private statusMarker(monster: MonsterUnit, label: string, color: number): void {
+    const text = this.add.text(monster.container.x, monster.container.y - 68, label, this.textStyle(15, '#fff8d5', 900)).setOrigin(0.5).setDepth(90);
+    text.setStroke(Phaser.Display.Color.IntegerToColor(color).rgba, 4);
+    this.effectLayer.add(text);
+    this.tweens.add({
+      targets: text,
+      y: text.y - 26,
+      alpha: 0,
+      duration: 660,
+      ease: 'Sine.easeOut',
+      onComplete: () => text.destroy(),
+    });
   }
 
   private areaDamage(x: number, y: number, radius: number, damage: number, source: HeroUnit, color: number): void {
@@ -1479,11 +1570,14 @@ export class BattleScene extends Phaser.Scene {
       .slice(0, limit);
   }
 
-  private healHero(hero: HeroUnit, amount: number): void {
-    const stats = this.statsFor(hero);
-    hero.hp = Math.min(stats.maxHp, hero.hp + amount);
-    this.refreshHeroVisual(hero);
-    this.flashAt(hero.container.x, hero.container.y - 58, 0x9aff9a, `+${Math.round(amount)}`);
+  private repairCrystal(amount: number, color: number): void {
+    const maxHp = crystalMaxHp(this.baseLevels.crystal);
+    const before = this.crystalHp;
+    this.crystalHp = Math.min(maxHp, this.crystalHp + amount);
+    if (this.crystalHp > before) {
+      this.flashAt(CRYSTAL_POS.x, CRYSTAL_POS.y - 44, color, `+${Math.round(this.crystalHp - before)}`);
+      this.refreshHud();
+    }
   }
 
   private refreshHeroVisual(hero: HeroUnit): void {
@@ -1913,6 +2007,8 @@ export class BattleScene extends Phaser.Scene {
     } else {
       hero.learned9 = true;
     }
+    this.circleEffect(hero.container.x, hero.container.y - 20, level === 9 ? 170 : 118, hero.def.accent, 620);
+    this.skillRuneEffect(hero.container.x, hero.container.y - 82, hero.def.accent, `${level}阶解锁`);
     this.flashAt(hero.container.x, hero.container.y - 64, hero.def.accent, skill.name);
     this.renderSelectedPanel();
     this.refreshAll();
@@ -2012,6 +2108,7 @@ export class BattleScene extends Phaser.Scene {
   private renderSelectedPanel(): void {
     this.selectedPanel?.destroy();
     const panel = this.add.container(WIDTH / 2, SELECTED_PANEL_Y).setDepth(130);
+    this.bottomUi.add(panel);
     const bg = this.add.rectangle(0, 0, WIDTH - 64, 132, 0x141b17, 0.96).setStrokeStyle(2, 0xd6aa55, 0.28);
     panel.add(bg);
 
@@ -2287,6 +2384,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private showMessage(message: string): void {
+    this.messageText?.setY(this.topUiExpanded ? 326 : 116);
     this.messageText?.setText(message);
     this.messageText?.setAlpha(1);
     this.tweens.killTweensOf(this.messageText);

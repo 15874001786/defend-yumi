@@ -31,7 +31,7 @@ export const BASE_UPGRADES: BaseUpgradeTrack[] = [
   {
     id: 'crystal',
     name: '晶核护壁',
-    description: '每级使水晶最大生命 +90，并降低怪物对英雄伤害。',
+    description: '每级使水晶最大生命 +90，并降低怪物对晶核伤害。',
     perLevel: 90,
     costs: [130, 210, 320, 480, 700, 980, 1320, 1760, 2260],
   },
