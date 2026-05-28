@@ -283,7 +283,7 @@ export class BattleScene extends Phaser.Scene {
       this.load.image(`hero-${hero.id}`, `${ASSET_BASE}/heroes/rendered/${hero.id}.png`);
     }
     for (const monster of MONSTER_KINDS) {
-      this.load.svg(`monster-${monster}`, `${ASSET_BASE}/monsters/${monster}.svg`, { width: 100, height: 112 });
+      this.load.image(`monster-${monster}`, `${ASSET_BASE}/monsters/rendered/${monster}.png`);
     }
     this.load.svg('crystal', `${ASSET_BASE}/ui/crystal.svg`, { width: 140, height: 170 });
   }
@@ -1171,7 +1171,8 @@ export class BattleScene extends Phaser.Scene {
     const start = path[0];
     const container = this.add.container(start.x, start.y).setDepth(40);
     const aura = this.add.ellipse(0, -18, 84 + tier * 8, 72 + tier * 7, isGold ? 0xffd36e : 0x92ffb8, isGold ? 0.2 : 0.05 + tier * 0.025);
-    const sprite = this.add.image(0, -18, `monster-${kind}`).setScale(mod.scale);
+    const sprite = this.add.image(0, -18, `monster-${kind}`);
+    this.sizeMonsterSprite(sprite, mod.scale);
     const hpBack = this.add.rectangle(-34, 45, 68, 7, 0x111111, 0.82).setOrigin(0, 0.5);
     const hpFill = this.add.rectangle(-34, 45, 68, 7, isGold ? 0xffd36e : 0xff6b5c, 1).setOrigin(0, 0.5);
     const badge = this.add.text(0, -78, isGold ? '金币' : `Lv.${wave.wave}`, this.textStyle(13, isGold ? '#fff1a6' : '#e7fff1', 900)).setOrigin(0.5).setAlpha(isGold ? 1 : 0.72);
@@ -1753,7 +1754,8 @@ export class BattleScene extends Phaser.Scene {
     const tier = Math.min(4, Math.floor(Math.max(0, this.currentWave - 1) / 4));
     const container = this.add.container(saved.x, saved.y).setDepth(40);
     const aura = this.add.ellipse(0, -18, 84 + tier * 8, 72 + tier * 7, saved.isGold ? 0xffd36e : 0x92ffb8, saved.isGold ? 0.2 : 0.05 + tier * 0.025);
-    const sprite = this.add.image(0, -18, `monster-${saved.kind}`).setScale(mod.scale);
+    const sprite = this.add.image(0, -18, `monster-${saved.kind}`);
+    this.sizeMonsterSprite(sprite, mod.scale);
     const hpBack = this.add.rectangle(-34, 45, 68, 7, 0x111111, 0.82).setOrigin(0, 0.5);
     const hpFill = this.add.rectangle(-34, 45, 68, 7, saved.isGold ? 0xffd36e : 0xff6b5c, 1).setOrigin(0, 0.5);
     const badge = this.add.text(0, -78, saved.isGold ? '金币' : `Lv.${Math.max(1, this.currentWave)}`, this.textStyle(13, saved.isGold ? '#fff1a6' : '#e7fff1', 900)).setOrigin(0.5).setAlpha(saved.isGold ? 1 : 0.72);
@@ -1791,6 +1793,10 @@ export class BattleScene extends Phaser.Scene {
     };
     this.monsters.push(monster);
     this.refreshMonsterVisual(monster);
+  }
+
+  private sizeMonsterSprite(sprite: Phaser.GameObjects.Image, scale: number): void {
+    sprite.setDisplaySize(102 * scale, 118 * scale);
   }
 
   private changeDifficulty(difficulty: DifficultyId): void {
