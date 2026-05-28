@@ -7,19 +7,19 @@ import type { BaseLevels, BaseUpgradeTrack, DifficultyId, HeroDefinition, HeroSt
 
 const WIDTH = 900;
 const HEIGHT = 1600;
-const BOARD_CENTER = { x: 450, y: 664 };
-const CRYSTAL_POS = { x: 802, y: 334 };
-const BOARD_TOP = 356;
+const BOARD_CENTER = { x: 450, y: 642 };
+const CRYSTAL_POS = { x: 824, y: 294 };
+const BOARD_TOP = 260;
 const BOARD_GRID = {
-  cols: 6,
-  rows: 5,
-  cell: 104,
-  x: 190,
-  y: 404,
+  cols: 7,
+  rows: 6,
+  cell: 92,
+  x: 174,
+  y: 412,
 };
-const SELECTED_PANEL_Y = 980;
-const BENCH_Y = 1116;
-const SHOP_Y = 1312;
+const SELECTED_PANEL_Y = 1064;
+const BENCH_Y = 1218;
+const SHOP_Y = 1412;
 const ASSET_BASE = `${import.meta.env.BASE_URL}assets`;
 const SAVE_KEY = 'crystal-wardens-save-v2';
 
@@ -60,6 +60,7 @@ interface HeroUnit {
   learned6: boolean;
   learned9: boolean;
   reviveUsedWave: number;
+  specialReadyAt: number;
   location: HeroLocation;
   container: Phaser.GameObjects.Container;
   sprite: Phaser.GameObjects.Image;
@@ -136,6 +137,7 @@ interface SavedHero {
   learned6: boolean;
   learned9: boolean;
   reviveUsedWave: number;
+  specialRemaining?: number;
   location: HeroLocation;
 }
 
@@ -205,6 +207,7 @@ export class BattleScene extends Phaser.Scene {
   private rangeGraphics!: Phaser.GameObjects.Graphics;
   private uiLayer!: Phaser.GameObjects.Layer;
   private effectLayer!: Phaser.GameObjects.Layer;
+  private fixedTopUi!: Phaser.GameObjects.Container;
   private topUi!: Phaser.GameObjects.Container;
   private bottomUi!: Phaser.GameObjects.Container;
   private slots: Slot[] = [];
@@ -299,8 +302,9 @@ export class BattleScene extends Phaser.Scene {
     this.input.topOnly = true;
     this.effectLayer = this.add.layer().setDepth(70);
     this.uiLayer = this.add.layer().setDepth(100);
-    this.topUi = this.add.container(0, 0).setDepth(100);
-    this.bottomUi = this.add.container(0, 0).setDepth(100);
+    this.fixedTopUi = this.add.container(0, 0).setDepth(132);
+    this.topUi = this.add.container(0, 0).setDepth(120);
+    this.bottomUi = this.add.container(0, 0).setDepth(110);
     this.createBackground();
     this.createBoard();
     this.createCrystal();
@@ -351,7 +355,7 @@ export class BattleScene extends Phaser.Scene {
   private drawPaths(): void {
     this.pathGraphics.clear();
     const points = this.createPath('left', 0);
-    this.pathGraphics.lineStyle(96, 0x6d5a36, 0.28);
+    this.pathGraphics.lineStyle(104, 0x6d5a36, 0.28);
     this.pathGraphics.beginPath();
     this.pathGraphics.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i += 1) {
@@ -359,7 +363,7 @@ export class BattleScene extends Phaser.Scene {
     }
     this.pathGraphics.strokePath();
 
-    this.pathGraphics.lineStyle(78, 0xc2ac72, 0.98);
+    this.pathGraphics.lineStyle(84, 0xc2ac72, 0.98);
     this.pathGraphics.beginPath();
     this.pathGraphics.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i += 1) {
@@ -452,37 +456,37 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createHud(): void {
-    const topPanel = this.add.rectangle(WIDTH / 2, 154, WIDTH - 34, 300, 0x0d1210, 0.9).setStrokeStyle(2, 0xd6aa55, 0.28);
-    const statCard = this.add.rectangle(154, 142, 248, 244, 0x142319, 0.92).setStrokeStyle(2, 0x8bcf8b, 0.28);
-    const actionCard = this.add.rectangle(414, 150, 300, 268, 0x142018, 0.9).setStrokeStyle(2, 0xf2ca73, 0.24);
-    const upgradeCard = this.add.rectangle(736, 150, 252, 268, 0x122019, 0.92).setStrokeStyle(2, 0x7dd8bc, 0.24);
-    const resourceTitle = this.add.text(42, 28, '资源', this.textStyle(16, '#9fc9b2', 800));
-    this.hudGold = this.add.text(42, 52, '', this.textStyle(28, '#ffe09a', 800)).setDepth(102);
-    this.hudWave = this.add.text(42, 92, '', this.textStyle(22, '#e8fff8', 800)).setDepth(102);
-    this.hudCrystal = this.add.text(42, 126, '', this.textStyle(20, '#9dfff0', 800)).setDepth(102);
-    this.hudCapacity = this.add.text(42, 158, '', this.textStyle(19, '#cde9d2', 700)).setDepth(102);
-    this.topUi.add([topPanel, statCard, actionCard, upgradeCard, resourceTitle, this.hudGold, this.hudWave, this.hudCrystal, this.hudCapacity]);
-
-    const controlTitle = this.add.text(304, 29, '战斗控制', this.textStyle(17, '#fff4bd', 800));
-    const battleButton = this.createButton(346, 70, 124, 56, '开战', 0xe96b45, () => this.startNextWave(), 20, 4, 134, 64);
-
-    const pauseButton = this.createButton(490, 70, 124, 56, '暂停', 0x49677b, () => this.togglePause(), 18, 4, 134, 64);
+    const fixedPanel = this.add.rectangle(WIDTH / 2, 58, WIDTH - 26, 106, 0x0d1411, 0.92).setStrokeStyle(2, 0xd6aa55, 0.28);
+    const resourceCard = this.add.rectangle(236, 58, 424, 82, 0x142319, 0.92).setStrokeStyle(2, 0x8bcf8b, 0.22);
+    this.hudGold = this.add.text(42, 28, '', this.textStyle(24, '#ffe09a', 900));
+    this.hudWave = this.add.text(42, 62, '', this.textStyle(18, '#e8fff8', 800));
+    this.hudCrystal = this.add.text(226, 28, '', this.textStyle(18, '#9dfff0', 800));
+    this.hudCapacity = this.add.text(226, 62, '', this.textStyle(18, '#cde9d2', 800));
+    const battleButton = this.createButton(548, 58, 118, 58, '开战', 0xe96b45, () => this.startNextWave(), 20, 4, 128, 66);
+    const pauseButton = this.createButton(682, 58, 118, 58, '暂停', 0x49677b, () => this.togglePause(), 18, 4, 128, 66);
     this.pauseLabel = pauseButton.getByName('label') as Phaser.GameObjects.Text;
+    const topToggle = this.createButton(812, 58, 126, 58, '展开升级', 0x223c32, () => this.setTopUiExpanded(!this.topUiExpanded), 16, 4, 136, 66);
+    this.topToggleLabel = topToggle.getByName('label') as Phaser.GameObjects.Text;
+    this.fixedTopUi.add([fixedPanel, resourceCard, this.hudGold, this.hudWave, this.hudCrystal, this.hudCapacity, battleButton, pauseButton, topToggle]);
 
-    const expandButton = this.createButton(418, 136, 272, 58, '', 0x4fb591, () => this.buyGridExpansion(), 17, 4, 286, 66);
+    const topPanel = this.add.rectangle(WIDTH / 2, 224, WIDTH - 42, 210, 0x0d1210, 0.93).setStrokeStyle(2, 0xd6aa55, 0.28);
+    const actionCard = this.add.rectangle(242, 224, 410, 172, 0x142018, 0.9).setStrokeStyle(2, 0xf2ca73, 0.22);
+    const upgradeCard = this.add.rectangle(680, 224, 390, 172, 0x122019, 0.92).setStrokeStyle(2, 0x7dd8bc, 0.24);
+    const controlTitle = this.add.text(58, 142, '扩容 / 存档 / 难度', this.textStyle(17, '#fff4bd', 800));
+    const expandButton = this.createButton(242, 182, 330, 52, '', 0x4fb591, () => this.buyGridExpansion(), 17, 0, 330, 52);
     this.expandLabel = expandButton.getByName('label') as Phaser.GameObjects.Text;
 
-    const saveButton = this.createButton(346, 200, 124, 44, '保存', 0x2d7363, () => this.saveGame(), 16, 4, 134, 52);
-    const loadButton = this.createButton(490, 200, 124, 44, '读取', 0x354c60, () => this.loadSavedGame(), 16, 4, 134, 52);
-    this.topUi.add([controlTitle, battleButton, pauseButton, expandButton, saveButton, loadButton]);
+    const saveButton = this.createButton(164, 240, 132, 44, '保存', 0x2d7363, () => this.saveGame(), 16, 0, 132, 44);
+    const loadButton = this.createButton(320, 240, 132, 44, '读取', 0x354c60, () => this.loadSavedGame(), 16, 0, 132, 44);
+    this.topUi.add([topPanel, actionCard, upgradeCard, controlTitle, expandButton, saveButton, loadButton]);
 
-    const difficultyTitle = this.add.text(314, 244, '难度', this.textStyle(14, '#99c7ad', 800));
+    const difficultyTitle = this.add.text(58, 282, '难度', this.textStyle(14, '#99c7ad', 800));
     this.topUi.add(difficultyTitle);
     DIFFICULTIES.forEach((difficulty, index) => {
       const active = difficulty.id === this.difficulty;
       const button = this.createButton(
-        366 + index * 60,
-        264,
+        142 + index * 76,
+        300,
         54,
         36,
         difficulty.shortName,
@@ -497,12 +501,12 @@ export class BattleScene extends Phaser.Scene {
       this.topUi.add(button);
     });
 
-    const upgradeTitle = this.add.text(622, 29, '基地升级', this.textStyle(17, '#fff4bd', 800));
+    const upgradeTitle = this.add.text(520, 142, '基地升级', this.textStyle(17, '#fff4bd', 800));
     this.topUi.add(upgradeTitle);
     const positions: Array<[BaseUpgradeTrack['id'], number, number]> = [
-      ['attack', 736, 72],
-      ['speed', 736, 144],
-      ['crystal', 736, 216],
+      ['attack', 680, 182],
+      ['speed', 680, 240],
+      ['crystal', 680, 298],
     ];
 
     for (const [id, x, y] of positions) {
@@ -510,7 +514,7 @@ export class BattleScene extends Phaser.Scene {
       if (!upgrade) {
         continue;
       }
-      const button = this.createButton(x, y, 222, 56, '', 0x2d7363, () => this.buyBaseUpgrade(id), 14, 4, 232, 66);
+      const button = this.createButton(x, y, 314, 44, '', 0x2d7363, () => this.buyBaseUpgrade(id), 14, 0, 314, 44);
       this.baseLabels[id] = button.getByName('label') as Phaser.GameObjects.Text;
       this.topUi.add(button);
     }
@@ -525,9 +529,9 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createBench(): void {
-    const bottomPanel = this.add.rectangle(WIDTH / 2, 1300, WIDTH - 34, 600, 0x101512, 0.92).setStrokeStyle(2, 0x70c7b4, 0.2);
-    const benchTitle = this.add.text(34, 1056, '备战区', this.textStyle(26, '#e7fff1', 800));
-    const benchHint = this.add.text(140, 1061, '可先合成，再拖入战斗区', this.textStyle(18, '#9fc9b2', 600));
+    const bottomPanel = this.add.rectangle(WIDTH / 2, 1388, WIDTH - 34, 420, 0x101512, 0.92).setStrokeStyle(2, 0x70c7b4, 0.2);
+    const benchTitle = this.add.text(34, 1162, '备战区', this.textStyle(26, '#e7fff1', 800));
+    const benchHint = this.add.text(140, 1168, '可先合成，再拖入战斗区', this.textStyle(18, '#9fc9b2', 600));
     this.bottomUi.add([bottomPanel, benchTitle, benchHint]);
 
     const startX = 66;
@@ -544,22 +548,18 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createShop(): void {
-    const shopTitle = this.add.text(34, 1192, '英雄商店', this.textStyle(26, '#ffe09a', 800));
-    const shopHint = this.add.text(34, 1224, '大卡片拖拽购买，翻页查看全部英雄', this.textStyle(18, '#ccb782', 600));
+    const shopTitle = this.add.text(34, 1330, '英雄商店', this.textStyle(26, '#ffe09a', 800));
+    const shopHint = this.add.text(34, 1362, '大卡片拖拽购买，翻页查看全部英雄', this.textStyle(18, '#ccb782', 600));
 
-    const prev = this.createButton(612, 1234, 86, 40, '上页', 0x2d7363, () => this.changeShopPage(-1), 16);
-    const next = this.createButton(812, 1234, 86, 40, '下页', 0x2d7363, () => this.changeShopPage(1), 16);
-    this.shopPageText = this.add.text(712, 1234, '', this.textStyle(17, '#e8fff8', 800)).setOrigin(0.5);
+    const prev = this.createButton(612, 1360, 86, 40, '上页', 0x2d7363, () => this.changeShopPage(-1), 16);
+    const next = this.createButton(812, 1360, 86, 40, '下页', 0x2d7363, () => this.changeShopPage(1), 16);
+    this.shopPageText = this.add.text(712, 1360, '', this.textStyle(17, '#e8fff8', 800)).setOrigin(0.5);
     this.bottomUi.add([shopTitle, shopHint, prev, next, this.shopPageText]);
     this.renderShopCards();
   }
 
   private createHudToggles(): void {
-    const topToggle = this.createButton(790, 28, 174, 42, '展开控制', 0x223c32, () => this.setTopUiExpanded(!this.topUiExpanded), 16, 4, 190, 52);
-    topToggle.setDepth(180);
-    this.topToggleLabel = topToggle.getByName('label') as Phaser.GameObjects.Text;
-
-    const bottomToggle = this.createButton(WIDTH / 2, HEIGHT - 34, 214, 46, '展开商店', 0x223c32, () => this.setBottomUiExpanded(!this.bottomUiExpanded), 17, 4, 232, 56);
+    const bottomToggle = this.createButton(760, 1188, 214, 46, '展开商店', 0x223c32, () => this.setBottomUiExpanded(!this.bottomUiExpanded), 17, 4, 232, 56);
     bottomToggle.setDepth(180);
     this.bottomToggleLabel = bottomToggle.getByName('label') as Phaser.GameObjects.Text;
   }
@@ -567,7 +567,8 @@ export class BattleScene extends Phaser.Scene {
   private setTopUiExpanded(expanded: boolean, announce = true): void {
     this.topUiExpanded = expanded;
     this.topUi.setVisible(expanded);
-    this.topToggleLabel?.setText(expanded ? '收起控制' : '展开控制');
+    this.setContainerInputEnabled(this.topUi, expanded);
+    this.topToggleLabel?.setText(expanded ? '收起升级' : '展开升级');
     if (announce) {
       this.showMessage(expanded ? '顶部控制已展开。' : '顶部控制已收起，战场视野已让出。');
     }
@@ -576,10 +577,25 @@ export class BattleScene extends Phaser.Scene {
   private setBottomUiExpanded(expanded: boolean, announce = true): void {
     this.bottomUiExpanded = expanded;
     this.bottomUi.setVisible(expanded);
+    this.setContainerInputEnabled(this.bottomUi, expanded);
     this.bottomToggleLabel?.setText(expanded ? '收起商店' : '展开商店');
     if (announce) {
       this.showMessage(expanded ? '底部商店与备战区已展开。' : '底部区域已收起，路线不会被遮挡。');
     }
+  }
+
+  private setContainerInputEnabled(container: Phaser.GameObjects.Container, enabled: boolean): void {
+    const walk = (gameObject: Phaser.GameObjects.GameObject): void => {
+      const maybeInteractive = gameObject as Phaser.GameObjects.GameObject & {
+        input?: Phaser.Types.Input.InteractiveObject;
+        list?: Phaser.GameObjects.GameObject[];
+      };
+      if (maybeInteractive.input) {
+        maybeInteractive.input.enabled = enabled;
+      }
+      maybeInteractive.list?.forEach(walk);
+    };
+    walk(container);
   }
 
   private createShopCard(hero: HeroDefinition, x: number, y: number, width: number, height: number): Phaser.GameObjects.Container {
@@ -785,6 +801,7 @@ export class BattleScene extends Phaser.Scene {
       learned6: false,
       learned9: false,
       reviveUsedWave: -1,
+      specialReadyAt: 0,
       location,
       container,
       sprite,
@@ -967,6 +984,7 @@ export class BattleScene extends Phaser.Scene {
       if (hero.location.type !== 'board' || hero.hp <= 0) {
         continue;
       }
+      this.updateHeroPassive(hero, time);
       hero.cooldown -= dt;
       if (hero.cooldown > 0) {
         continue;
@@ -994,6 +1012,41 @@ export class BattleScene extends Phaser.Scene {
     return inRange.sort((a, b) => b.progress - a.progress)[0];
   }
 
+  private updateHeroPassive(hero: HeroUnit, time: number): void {
+    if (hero.specialReadyAt > time) {
+      return;
+    }
+    const stats = this.statsFor(hero);
+    const target = this.selectTarget(hero, stats);
+    if (!target) {
+      hero.specialReadyAt = time + 450;
+      return;
+    }
+
+    if (hero.def.id === 'storm-caller' && hero.learned9) {
+      const priority = this.monsters
+        .filter((monster) => !monster.dead)
+        .sort((a, b) => b.progress - a.progress || b.hp - a.hp)[0] ?? target;
+      this.skyLightningStrike(priority, stats.damage * 1.65, hero);
+      hero.specialReadyAt = time + 2000;
+      return;
+    }
+
+    if (hero.def.id === 'frost-marshal' && hero.learned9) {
+      this.frostFieldEffect(target.container.x, target.container.y, 188, stats.damage * 0.7, hero, time, true, 1700);
+      hero.specialReadyAt = time + 3600;
+      return;
+    }
+
+    if (hero.def.id === 'ember-warden' && hero.learned9) {
+      this.meteorStrike(target.container.x, target.container.y, 166, stats.damage * 1.25, hero, time);
+      hero.specialReadyAt = time + 3400;
+      return;
+    }
+
+    hero.specialReadyAt = time + 1200;
+  }
+
   private performHeroAttack(hero: HeroUnit, target: MonsterUnit, stats: HeroStats, time: number): void {
     const x = hero.container.x;
     const y = hero.container.y - 20;
@@ -1008,10 +1061,11 @@ export class BattleScene extends Phaser.Scene {
         this.damageMonster(target, stats.damage, hero);
         this.applyBurn(target, stats.damage * 0.24, time + 3200);
         if (hero.learned6) {
-          this.nearbyMonsters(target, 120, 2).forEach((monster) => this.applyBurn(monster, stats.damage * 0.2, time + 2600));
+          this.fireFieldEffect(tx, ty, 128, stats.damage * 0.22, hero, time, 2400);
+          this.nearbyMonsters(target, 150, 3).forEach((monster) => this.applyBurn(monster, stats.damage * 0.22, time + 3000));
         }
         if (hero.learned9 && hero.attackCounter % 5 === 4) {
-          this.areaDamage(tx, ty, 115, stats.damage * 1.4, hero, 0xff7a35);
+          this.meteorStrike(tx, ty, 176, stats.damage * 1.4, hero, time);
         }
         break;
       }
@@ -1024,8 +1078,11 @@ export class BattleScene extends Phaser.Scene {
           this.damageMonster(monster, stats.damage * bonus, hero);
           this.applySlow(monster, hero.learned6 ? 0.42 : 0.55, time + (hero.learned6 ? 2600 : 1800));
         }
+        if (hero.learned6) {
+          this.frostFieldEffect(tx, ty, 136, stats.damage * 0.25, hero, time, false, 2400);
+        }
         if (hero.learned9 && hero.attackCounter % 6 === 5) {
-          target.status.stunUntil = Math.max(target.status.stunUntil, time + 1200);
+          this.frostFieldEffect(tx, ty, 184, stats.damage * 0.62, hero, time, true, 1600);
           this.flashAt(tx, ty - 35, 0xd8f6ff, '冻结');
         }
         break;
@@ -1049,11 +1106,10 @@ export class BattleScene extends Phaser.Scene {
           current = next;
           damage *= hero.learned6 ? 0.82 : 0.68;
         }
-        if (hero.learned9 && hero.attackCounter % 7 === 6) {
+        if (hero.learned9 && hero.attackCounter % 3 === 2) {
           const highest = this.monsters.filter((monster) => !monster.dead).sort((a, b) => b.hp - a.hp)[0];
           if (highest) {
-            this.lightningEffect(BOARD_CENTER.x, BOARD_TOP, highest.container.x, highest.container.y, 0xfff69b, 6);
-            this.damageMonster(highest, stats.damage * 2.1, hero);
+            this.skyLightningStrike(highest, stats.damage * 1.55, hero);
           }
         }
         break;
@@ -1263,6 +1319,119 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
+  private fireFieldEffect(x: number, y: number, radius: number, tickDamage: number, source: HeroUnit, time: number, duration: number): void {
+    const field = this.add.graphics().setDepth(77);
+    field.fillStyle(0xff5a24, 0.14);
+    field.fillEllipse(x, y, radius * 2, radius * 0.9);
+    field.lineStyle(4, 0xffc15f, 0.62);
+    field.strokeEllipse(x, y, radius * 2, radius * 0.9);
+    field.lineStyle(2, 0xff7a35, 0.72);
+    field.strokeEllipse(x, y, radius * 1.38, radius * 0.62);
+    this.effectLayer.add(field);
+    this.tweens.add({ targets: field, alpha: 0, duration, ease: 'Sine.easeOut', onComplete: () => field.destroy() });
+
+    for (let i = 0; i < 12; i += 1) {
+      const ember = this.add.circle(
+        x + Phaser.Math.Between(-radius, radius),
+        y + Phaser.Math.Between(-Math.round(radius * 0.45), Math.round(radius * 0.45)),
+        Phaser.Math.Between(3, 7),
+        i % 2 ? 0xffd27a : 0xff6a2a,
+        0.78,
+      ).setDepth(84);
+      this.effectLayer.add(ember);
+      this.tweens.add({
+        targets: ember,
+        y: ember.y - Phaser.Math.Between(26, 58),
+        scale: 0.35,
+        alpha: 0,
+        duration: Phaser.Math.Between(520, 980),
+        delay: Phaser.Math.Between(0, 360),
+        ease: 'Sine.easeOut',
+        onComplete: () => ember.destroy(),
+      });
+    }
+
+    const ticks = Math.max(2, Math.floor(duration / 520));
+    for (let i = 0; i < ticks; i += 1) {
+      this.time.delayedCall(i * 520, () => {
+        this.circleEffect(x, y, radius, 0xff7a35, 260);
+        for (const monster of this.monstersInRadius(x, y, radius)) {
+          this.damageMonster(monster, tickDamage, source);
+          this.applyBurn(monster, tickDamage * 0.38, time + duration + 800);
+        }
+      });
+    }
+  }
+
+  private frostFieldEffect(x: number, y: number, radius: number, damage: number, source: HeroUnit, time: number, freeze: boolean, duration: number): void {
+    const field = this.add.graphics().setDepth(78);
+    field.fillStyle(0x91e9ff, freeze ? 0.2 : 0.12);
+    field.fillEllipse(x, y, radius * 2, radius * 0.78);
+    field.lineStyle(freeze ? 6 : 4, 0xd8f6ff, 0.78);
+    field.strokeEllipse(x, y, radius * 2, radius * 0.78);
+    field.lineStyle(2, 0xffffff, 0.45);
+    for (let i = 0; i < 6; i += 1) {
+      const angle = (Math.PI * 2 * i) / 6;
+      field.lineBetween(x, y, x + Math.cos(angle) * radius * 0.9, y + Math.sin(angle) * radius * 0.36);
+    }
+    this.effectLayer.add(field);
+    this.tweens.add({
+      targets: field,
+      scaleX: 1.08,
+      scaleY: 1.08,
+      alpha: 0,
+      duration,
+      ease: 'Sine.easeOut',
+      onComplete: () => field.destroy(),
+    });
+
+    for (const monster of this.monstersInRadius(x, y, radius)) {
+      this.damageMonster(monster, damage, source);
+      this.applySlow(monster, freeze ? 0.18 : 0.36, time + duration + 700);
+      if (freeze) {
+        monster.status.stunUntil = Math.max(monster.status.stunUntil, time + duration);
+        this.statusMarker(monster, '冻结', 0xd8f6ff);
+      }
+    }
+  }
+
+  private skyLightningStrike(monster: MonsterUnit, damage: number, source: HeroUnit): void {
+    const x = monster.container.x;
+    const y = monster.container.y - 14;
+    this.lightningEffect(x + Phaser.Math.Between(-36, 36), Math.max(108, y - 520), x, y, 0xfff69b, 7);
+    const flash = this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT, 0xfff3a6, 0.06).setDepth(75);
+    this.effectLayer.add(flash);
+    this.tweens.add({ targets: flash, alpha: 0, duration: 180, onComplete: () => flash.destroy() });
+    this.circleEffect(x, y, 122, 0xfff69b, 360);
+    monster.status.stunUntil = Math.max(monster.status.stunUntil, this.time.now + 220);
+    this.damageMonster(monster, damage, source);
+    this.flashAt(x, y - 62, 0xfff69b, '天穹落雷');
+  }
+
+  private meteorStrike(x: number, y: number, radius: number, damage: number, source: HeroUnit, time: number): void {
+    const meteor = this.add.circle(x - 150, y - 360, 18, 0xff8b35, 0.94).setStrokeStyle(5, 0xfff0a8, 0.8).setDepth(86);
+    const trail = this.add.graphics().setDepth(85);
+    trail.lineStyle(12, 0xff8b35, 0.28);
+    trail.lineBetween(x - 150, y - 360, x, y);
+    trail.lineStyle(4, 0xfff0a8, 0.78);
+    trail.lineBetween(x - 150, y - 360, x, y);
+    this.effectLayer.add([trail, meteor]);
+    this.tweens.add({
+      targets: meteor,
+      x,
+      y,
+      scale: 1.6,
+      duration: 320,
+      ease: 'Sine.easeIn',
+      onComplete: () => {
+        meteor.destroy();
+        trail.destroy();
+        this.areaDamage(x, y, radius, damage, source, 0xff7a35);
+        this.fireFieldEffect(x, y, radius * 0.72, damage * 0.18, source, time, 2200);
+      },
+    });
+  }
+
   private updateWaveSpawner(time: number): void {
     if (!this.activeWave) {
       return;
@@ -1331,10 +1500,10 @@ export class BattleScene extends Phaser.Scene {
   private createPath(direction: Direction, offset: number): Phaser.Math.Vector2[] {
     void direction;
     return [
-      new Phaser.Math.Vector2(92 + offset * 0.15, BOARD_TOP - 150),
-      new Phaser.Math.Vector2(92 + offset * 0.15, 918),
-      new Phaser.Math.Vector2(802 + offset * 0.12, 918),
-      new Phaser.Math.Vector2(802 + offset * 0.08, CRYSTAL_POS.y + 78),
+      new Phaser.Math.Vector2(74 + offset * 0.15, BOARD_TOP - 150),
+      new Phaser.Math.Vector2(74 + offset * 0.15, 996),
+      new Phaser.Math.Vector2(824 + offset * 0.12, 996),
+      new Phaser.Math.Vector2(824 + offset * 0.08, CRYSTAL_POS.y + 92),
       new Phaser.Math.Vector2(CRYSTAL_POS.x, CRYSTAL_POS.y + 34),
     ];
   }
@@ -1644,6 +1813,11 @@ export class BattleScene extends Phaser.Scene {
     if (this.globalSpeedBuffUntil > 0) {
       this.globalSpeedBuffUntil += duration;
     }
+    for (const hero of this.heroes) {
+      if (hero.specialReadyAt > 0) {
+        hero.specialReadyAt += duration;
+      }
+    }
     for (const monster of this.monsters) {
       for (const key of ['burnUntil', 'poisonUntil', 'slowUntil', 'stunUntil', 'vulnerableUntil'] as const) {
         if (monster.status[key] > 0) {
@@ -1693,6 +1867,7 @@ export class BattleScene extends Phaser.Scene {
         learned6: hero.learned6,
         learned9: hero.learned9,
         reviveUsedWave: hero.reviveUsedWave,
+        specialRemaining: this.saveRemaining(hero.specialReadyAt, referenceTime),
         location: hero.location,
       })),
       monsters: this.monsters.map((monster) => ({
@@ -1795,6 +1970,7 @@ export class BattleScene extends Phaser.Scene {
       unit.learned6 = hero.learned6;
       unit.learned9 = hero.learned9;
       unit.reviveUsedWave = hero.reviveUsedWave;
+      unit.specialReadyAt = hero.specialRemaining && hero.specialRemaining > 0 ? now + hero.specialRemaining : 0;
       unit.container.setData('payload', { kind: 'hero', unitId: unit.uid } satisfies DragPayload);
       this.heroUid = Math.max(this.heroUid, unit.uid + 1);
       this.refreshHeroVisual(unit);
@@ -2108,7 +2284,6 @@ export class BattleScene extends Phaser.Scene {
   private renderSelectedPanel(): void {
     this.selectedPanel?.destroy();
     const panel = this.add.container(WIDTH / 2, SELECTED_PANEL_Y).setDepth(130);
-    this.bottomUi.add(panel);
     const bg = this.add.rectangle(0, 0, WIDTH - 64, 132, 0x141b17, 0.96).setStrokeStyle(2, 0xd6aa55, 0.28);
     panel.add(bg);
 
@@ -2177,7 +2352,8 @@ export class BattleScene extends Phaser.Scene {
     button.setInteractive(new Phaser.Geom.Rectangle(-touchWidth / 2, -touchHeight / 2, touchWidth, touchHeight), Phaser.Geom.Rectangle.Contains);
     button.on('pointerover', () => bg.setFillStyle(color, 1));
     button.on('pointerout', () => bg.setFillStyle(color, 0.88));
-    button.on('pointerdown', () => {
+    button.on('pointerdown', (_pointer: Phaser.Input.Pointer, _localX: number, _localY: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
       this.tweens.add({ targets: button, scale: 0.96, duration: 55, yoyo: true });
       onClick();
     });
@@ -2384,7 +2560,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private showMessage(message: string): void {
-    this.messageText?.setY(this.topUiExpanded ? 326 : 116);
+    this.messageText?.setY(this.topUiExpanded ? 352 : 128);
     this.messageText?.setText(message);
     this.messageText?.setAlpha(1);
     this.tweens.killTweensOf(this.messageText);

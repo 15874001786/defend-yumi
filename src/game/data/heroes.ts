@@ -20,8 +20,8 @@ export const HEROES: HeroDefinition[] = [
     summary: '单体火弹，持续灼烧并在高等级时向附近目标扩散。',
     skills: [
       { level: 3, name: '余烬跳燃', cost: 0, description: '灼烧目标死亡时对周围怪物造成一次火花伤害。' },
-      { level: 6, name: '火线蔓延', cost: 520, description: '攻击额外点燃目标附近 2 个怪物。' },
-      { level: 9, name: '熔核审判', cost: 1450, description: '每第 5 次攻击落下熔核，对范围内怪物造成高额火伤。' },
+      { level: 6, name: '火线蔓延', cost: 520, description: '攻击会在目标脚下留下持续灼烧火场。' },
+      { level: 9, name: '熔核审判', cost: 1450, description: '周期性落下熔核，爆炸后形成更大的燃烧区域。' },
     ],
   },
   {
@@ -41,8 +41,8 @@ export const HEROES: HeroDefinition[] = [
     summary: '范围冰环，造成中等伤害并降低怪物移动速度。',
     skills: [
       { level: 3, name: '碎霜', cost: 0, description: '冰环命中已减速目标时额外造成 35% 伤害。' },
-      { level: 6, name: '寒潮领域', cost: 560, description: '冰环半径提升，减速持续时间增加。' },
-      { level: 9, name: '绝对零域', cost: 1500, description: '周期性冻结一名精英怪物 1.2 秒。' },
+      { level: 6, name: '寒潮领域', cost: 560, description: '攻击会展开冰冻范围，持续压低怪物速度。' },
+      { level: 9, name: '绝对零域', cost: 1500, description: '周期性展开大范围冰域，暂时冻结区域内怪物。' },
     ],
   },
   {
@@ -63,7 +63,7 @@ export const HEROES: HeroDefinition[] = [
     skills: [
       { level: 3, name: '二次导流', cost: 0, description: '闪电连锁次数 +1。' },
       { level: 6, name: '过载电弧', cost: 720, description: '每次弹跳伤害衰减降低，并短暂麻痹目标。' },
-      { level: 9, name: '天穹落雷', cost: 1780, description: '每隔数次攻击召唤全屏落雷打击血量最高怪物。' },
+      { level: 9, name: '天穹落雷', cost: 1780, description: '每 2 秒从天上降下落雷，打击路线前方怪物。' },
     ],
   },
   {
